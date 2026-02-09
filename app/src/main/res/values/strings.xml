@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">MAPD726_project</string>
+    <string name="base_url">https://mapd713-group-project.onrender.com</string>
 </resources>
