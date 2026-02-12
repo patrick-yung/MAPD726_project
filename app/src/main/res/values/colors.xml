@@ -2,9 +2,18 @@
 <resources>
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
-
+//home screen colors
     <color name="smart_cart_green">#128C46</color>
     <color name="smart_cart_orange">#F88E26</color>
     <color name="light_background">#F4F6F8</color>
     <color name="dark_text">#333333</color>
+
+///comparison screen colors
+    <color name="costco_red">#E31837</color>
+    <color name="walmart_blue">#0071CE</color>
+    <color name="superstore_green">#4CAF50</color>
+    <color name="best_deal_bg">#FFF3CD</color>
+    <color name="badge_green">#43A047</color>
+    <color name="badge_red">#E53935</color>
+
 </resources>

@@ -104,12 +104,13 @@
                 android:gravity="center" />
 
             <Button
+                android:id="@+id/btnStartComparing"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="12dp"
+                android:backgroundTint="@color/white"
                 android:text="Start Comparing >"
                 android:textColor="@color/smart_cart_orange"
-                android:backgroundTint="@color/white"
                 android:textStyle="bold" />
         </LinearLayout>
     </androidx.cardview.widget.CardView>
