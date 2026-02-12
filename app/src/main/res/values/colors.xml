@@ -2,4 +2,9 @@
 <resources>
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
+
+    <color name="smart_cart_green">#128C46</color>
+    <color name="smart_cart_orange">#F88E26</color>
+    <color name="light_background">#F4F6F8</color>
+    <color name="dark_text">#333333</color>
 </resources>
