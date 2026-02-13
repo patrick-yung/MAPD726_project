@@ -60,13 +60,11 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-        private fun loadFragment(fragment: Fragment) {
-            supportFragmentManager.beginTransaction()
-                .replace(
-                    R.id.fragment_container,
-                    fragment
-                )
-                .commit()
-        }
+    private fun loadFragment(fragment: Fragment) {
+        supportFragmentManager.beginTransaction()
+            .replace(R.id.fragment_container, fragment)
+            .addToBackStack(null)
+            .commit()
+    }
     }
 
