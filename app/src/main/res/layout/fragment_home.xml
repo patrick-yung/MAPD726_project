@@ -1,0 +1,184 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    tools:context=".HomeFragment"
+    android:background="@color/light_background">
+    <!-- TODO: Update blank fragment layout -->
+    <View
+        android:id="@+id/headerBackground"
+        android:layout_width="match_parent"
+        android:layout_height="120dp"
+        android:background="@color/smart_cart_green"
+        app:layout_constraintTop_toTopOf="parent" />
+
+    <TextView
+        android:id="@+id/tvAppTitle"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="SmartCart"
+        android:textColor="@color/white"
+        android:textSize="24sp"
+        android:textStyle="bold"
+        android:drawablePadding="12dp"
+        app:drawableStartCompat="@drawable/outline_shopping_cart_24"
+        app:drawableTint="@color/white"
+        app:layout_constraintBottom_toTopOf="@+id/tvSubtitle"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintVertical_chainStyle="packed" />
+
+    <TextView
+        android:id="@+id/tvSubtitle"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Shop Smart, Save More"
+        android:textColor="#E0E0E0"
+        android:textSize="14sp"
+        app:layout_constraintBottom_toBottomOf="@+id/headerBackground"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/tvAppTitle" />
+
+    <androidx.cardview.widget.CardView
+        android:id="@+id/searchCard"
+        android:layout_width="match_parent"
+        android:layout_height="50dp"
+        android:layout_marginHorizontal="24dp"
+        android:layout_marginTop="16dp"
+        app:cardCornerRadius="8dp"
+        app:cardElevation="4dp"
+        app:layout_constraintTop_toBottomOf="@+id/headerBackground">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:gravity="center_vertical"
+            android:paddingHorizontal="16dp">
+
+            <ImageView
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:src="@android:drawable/ic_menu_search"
+                app:tint="#888888" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="12dp"
+                android:text="Search products..."
+                android:textColor="#888888"
+                android:textSize="16sp" />
+        </LinearLayout>
+    </androidx.cardview.widget.CardView>
+
+    <androidx.cardview.widget.CardView
+        android:id="@+id/promoCard"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginHorizontal="24dp"
+        android:layout_marginTop="24dp"
+        app:cardCornerRadius="12dp"
+        app:cardBackgroundColor="@color/smart_cart_orange"
+        app:layout_constraintTop_toBottomOf="@+id/searchCard">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="20dp"
+            android:gravity="center">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Compare Prices Across Stores"
+                android:textColor="@color/white"
+                android:textSize="18sp"
+                android:textStyle="bold"
+                android:gravity="center" />
+
+            <Button
+                android:id="@+id/btnStartComparing"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:backgroundTint="@color/white"
+                android:text="Start Comparing >"
+                android:textColor="@color/smart_cart_orange"
+                android:textStyle="bold" />
+        </LinearLayout>
+    </androidx.cardview.widget.CardView>
+
+    <GridLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginHorizontal="24dp"
+        android:layout_marginTop="24dp"
+        android:columnCount="3"
+        android:rowCount="2"
+        android:alignmentMode="alignMargins"
+        app:layout_constraintTop_toBottomOf="@+id/promoCard">
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_columnWeight="1"
+            android:gravity="center"
+            android:orientation="vertical"
+            android:background="@drawable/white_card_background"
+            android:padding="12dp"
+            android:layout_marginEnd="8dp"
+            android:layout_marginBottom="12dp">
+
+            <ImageView android:layout_width="40dp" android:layout_height="40dp"
+                android:src="@android:drawable/ic_menu_gallery"/>
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:text="Dairy" android:layout_marginTop="8dp"
+                android:textSize="12sp" android:textColor="@color/dark_text"/>
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_columnWeight="1"
+            android:gravity="center"
+            android:orientation="vertical"
+            android:background="@drawable/white_card_background"
+            android:padding="12dp"
+            android:layout_marginHorizontal="4dp"
+            android:layout_marginBottom="12dp">
+
+            <ImageView android:layout_width="40dp" android:layout_height="40dp"
+                android:src="@android:drawable/ic_menu_gallery"/>
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:text="Bakery" android:layout_marginTop="8dp"
+                android:textSize="12sp" android:textColor="@color/dark_text"/>
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_columnWeight="1"
+            android:gravity="center"
+            android:orientation="vertical"
+            android:background="@drawable/white_card_background"
+            android:padding="12dp"
+            android:layout_marginStart="8dp"
+            android:layout_marginBottom="12dp">
+
+            <ImageView android:layout_width="40dp" android:layout_height="40dp"
+                android:src="@android:drawable/ic_menu_gallery"/>
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:text="Vegetables" android:layout_marginTop="8dp"
+                android:textSize="12sp" android:textColor="@color/dark_text"/>
+        </LinearLayout>
+
+    </GridLayout>
+
+
+</androidx.constraintlayout.widget.ConstraintLayout>
