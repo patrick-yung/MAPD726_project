@@ -1,6 +1,5 @@
 package com.example.yungpakhongpatrick.mapd726_project
 
-import AddItemsFragment
 import DealsFragment
 import ListFragment
 import android.content.Intent
