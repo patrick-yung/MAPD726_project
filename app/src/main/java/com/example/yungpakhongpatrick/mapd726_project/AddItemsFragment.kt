@@ -14,6 +14,9 @@ import android.widget.TextView
 import android.widget.Toast
 import com.example.yungpakhongpatrick.mapd726_project.BaseFragment
 import com.example.yungpakhongpatrick.mapd726_project.R
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 class AddItemsFragment : BaseFragment(R.layout.fragment_add_items) {
 
@@ -39,10 +42,11 @@ class AddItemsFragment : BaseFragment(R.layout.fragment_add_items) {
         "Rice (8kg)" to listOf(18.99, 17.99, 19.49)
     )
 
-    // --- 2. MAIN LOGIC FUNCTION ---
+    private lateinit var viewModel: ListViewModel // Define it here
+
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-
+        viewModel = androidx.lifecycle.ViewModelProvider(requireActivity()).get(ListViewModel::class.java)
         // Find Views
         val etProductName = view.findViewById<AutoCompleteTextView>(R.id.etProductName)
         val tvPriceWalmart = view.findViewById<TextView>(R.id.tvPriceWalmart)
@@ -178,7 +182,7 @@ class AddItemsFragment : BaseFragment(R.layout.fragment_add_items) {
                     val listName = etListName.text.toString().trim()
 
                     if (listName.isEmpty()) {
-                        etListName.error = "Please enter a name"
+                        etListName.error = "Please enter a list name"
                     } else {
                         // SUCCESS: Save the list to your backend/database
                         saveListToBackend(listName, currentCartList)
@@ -216,10 +220,23 @@ class AddItemsFragment : BaseFragment(R.layout.fragment_add_items) {
         v3.setBackgroundColor(Color.TRANSPARENT)
     }
     private fun saveListToBackend(name: String, items: List<CartItem>) {
-        // TODO: Connect to Firebase or Room Database here
-        // Example object to save:
-        // val listToSave = mapOf("name" to name, "items" to items, "date" to System.currentTimeMillis())
+        val savedItems = items.map {
+            SavedItem(
+                name = it.name,
+                price = it.price,
+                store = it.store,
+                isChecked = false
+            )
+        }
 
-        println("Saving list $name with ${items.size} items to database...")
+        val formattedDate = SimpleDateFormat("MMM d, yyyy", Locale.getDefault()).format(Date())
+
+        val newListEntry = SavedList(
+            name = name,
+            date = formattedDate,
+            items = savedItems
+        )
+
+        viewModel.addList(newListEntry)
     }
 }

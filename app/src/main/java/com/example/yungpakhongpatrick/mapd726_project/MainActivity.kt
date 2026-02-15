@@ -1,7 +1,7 @@
 package com.example.yungpakhongpatrick.mapd726_project
 
 import DealsFragment
-import ListFragment
+
 import android.content.Intent
 import android.os.Bundle
 import android.widget.Button

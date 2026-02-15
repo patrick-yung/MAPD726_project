@@ -11,7 +11,7 @@
     <View
         android:id="@+id/headerBackground"
         android:layout_width="match_parent"
-        android:layout_height="120dp"
+        android:layout_height="80dp"
         android:background="@color/smart_cart_green"
         app:layout_constraintTop_toTopOf="parent" />
 
@@ -27,18 +27,17 @@
         app:layout_constraintBottom_toBottomOf="@+id/headerBackground" />
 
     <TextView
-        android:id="@+id/tvDealsTitle"
+        android:id="@+id/tvHeaderTitle"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Weekly Deals"
+        android:text="Weekly deals"
         android:textColor="@color/white"
-        android:textSize="24sp"
+        android:textSize="20sp"
         android:textStyle="bold"
-        app:layout_constraintBottom_toTopOf="@+id/rvDeals"
+        app:layout_constraintBottom_toBottomOf="@+id/headerBackground"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent"
-        app:layout_constraintVertical_chainStyle="packed" />
+        app:layout_constraintTop_toTopOf="@+id/headerBackground" />
 
 
     <androidx.recyclerview.widget.RecyclerView
