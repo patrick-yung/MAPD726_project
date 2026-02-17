@@ -1,8 +1,7 @@
 package com.example.yungpakhongpatrick.mapd726_project
 
-import AddItemsFragment
 import DealsFragment
-import ListFragment
+
 import android.content.Intent
 import android.os.Bundle
 import android.widget.Button
@@ -60,13 +59,11 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-        private fun loadFragment(fragment: Fragment) {
-            supportFragmentManager.beginTransaction()
-                .replace(
-                    R.id.fragment_container,
-                    fragment
-                )
-                .commit()
-        }
+    private fun loadFragment(fragment: Fragment) {
+        supportFragmentManager.beginTransaction()
+            .replace(R.id.fragment_container, fragment)
+            .addToBackStack(null)
+            .commit()
+    }
     }
 

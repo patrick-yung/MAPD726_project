@@ -11,9 +11,20 @@
     <View
         android:id="@+id/headerBackground"
         android:layout_width="match_parent"
-        android:layout_height="100dp"
+        android:layout_height="80dp"
         android:background="@color/smart_cart_green"
         app:layout_constraintTop_toTopOf="parent" />
+
+    <ImageView
+        android:id="@+id/btnBackArrow"
+        android:layout_width="48dp"
+        android:layout_height="48dp"
+        android:padding="12dp"
+        android:src="@drawable/outline_arrow_back_24"
+        app:tint="@color/white"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="@+id/headerBackground"
+        app:layout_constraintBottom_toBottomOf="@+id/headerBackground" />
 
     <TextView
         android:id="@+id/tvListTitle"
@@ -21,7 +32,7 @@
         android:layout_height="wrap_content"
         android:text="My Shopping List"
         android:textColor="@color/white"
-        android:textSize="22sp"
+        android:textSize="20sp"
         android:textStyle="bold"
         app:layout_constraintBottom_toBottomOf="@+id/headerBackground"
         app:layout_constraintEnd_toEndOf="parent"
