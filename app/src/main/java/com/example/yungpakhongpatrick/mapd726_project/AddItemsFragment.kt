@@ -16,13 +16,15 @@ import android.widget.Toast
 import com.example.yungpakhongpatrick.mapd726_project.BaseFragment
 import com.example.yungpakhongpatrick.mapd726_project.R
 import kotlinx.coroutines.*
+import org.json.JSONArray
+import org.json.JSONObject
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
 class AddItemsFragment : BaseFragment(R.layout.fragment_add_items) {
 
-    // --- 1. DEFINE VARIABLES AT CLASS LEVEL (NOT INSIDE FUNCTIONS) ---
+    // --- 1. DEFINE VARIABLES AT CLASS LEVEL ---
 
     // Simple data class
     data class CartItem(val name: String, val price: Double, val store: String)
@@ -46,6 +48,7 @@ class AddItemsFragment : BaseFragment(R.layout.fragment_add_items) {
 
     private lateinit var viewModel: ListViewModel
     private lateinit var apiService: ApiService
+    private var userId: String? = null // Will store the user ID after creation/fetch
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
@@ -62,7 +65,7 @@ class AddItemsFragment : BaseFragment(R.layout.fragment_add_items) {
         val tvPriceCostco = view.findViewById<TextView>(R.id.tvPriceCostco)
         val tvPriceSuperstore = view.findViewById<TextView>(R.id.tvPriceSuperstore)
 
-        // Store Layout Containers (The colored/clickable areas)
+        // Store Layout Containers
         val containerWalmart = view.findViewById<LinearLayout>(R.id.containerWalmart) ?: view.findViewById<LinearLayout>(R.id.storeButtonsLayout).getChildAt(0) as LinearLayout
         val containerCostco = view.findViewById<LinearLayout>(R.id.containerCostco) ?: view.findViewById<LinearLayout>(R.id.storeButtonsLayout).getChildAt(1) as LinearLayout
         val containerSuperstore = view.findViewById<LinearLayout>(R.id.containerSuperstore) ?: view.findViewById<LinearLayout>(R.id.storeButtonsLayout).getChildAt(2) as LinearLayout
@@ -134,7 +137,6 @@ class AddItemsFragment : BaseFragment(R.layout.fragment_add_items) {
                 ).show()
                 return@setOnClickListener
             } else {
-
                 val newItem = CartItem(productName, selectedPrice, selectedStoreName!!)
                 currentCartList.add(newItem)
                 tvEmptyHint.visibility = View.GONE
@@ -164,7 +166,7 @@ class AddItemsFragment : BaseFragment(R.layout.fragment_add_items) {
             }
         }
 
-        // Save List Button with POST test
+        // Save List Button - Now saves to backend
         btnSaveList.setOnClickListener {
             if (currentCartList.isEmpty()) {
                 Toast.makeText(requireContext(), "Your list is empty!", Toast.LENGTH_SHORT).show()
@@ -172,83 +174,172 @@ class AddItemsFragment : BaseFragment(R.layout.fragment_add_items) {
             }
 
             // Show loading message
-            Toast.makeText(requireContext(), "Testing API connection...", Toast.LENGTH_SHORT).show()
+            Toast.makeText(requireContext(), "Saving your list...", Toast.LENGTH_SHORT).show()
 
-            // Run POST test in background
+            // Run in background
             GlobalScope.launch(Dispatchers.IO) {
                 try {
-                    // Create a test user with unique username
-                    val username = "testuser_${System.currentTimeMillis()}"
-                    val response = apiService.createUser(username)
+                    // First, ensure we have a user (create or get existing)
+                    ensureUserExists()
 
-                    withContext(Dispatchers.Main) {
-                        if (response.success) {
-                            // API test successful
-                            Log.d("API_SUCCESS", "POST test successful: ${response.body}")
-                            Toast.makeText(requireContext(), "API test passed! You can now save your list.", Toast.LENGTH_SHORT).show()
-
-                            // ORIGINAL DIALOG CODE - Now show the save dialog
-                            // 1. Inflate the custom dialog layout
-                            val dialogView = LayoutInflater.from(requireContext()).inflate(R.layout.dialog_save_list, null)
-                            val etListName = dialogView.findViewById<EditText>(R.id.etListName)
-
-                            // 2. Create the AlertDialog
-                            val alertDialog = android.app.AlertDialog.Builder(requireContext())
-                                .setView(dialogView)
-                                .setCancelable(true)
-                                .setPositiveButton("Save", null) // Set to null first to handle validation
-                                .setNegativeButton("Cancel") { dialog, _ -> dialog.dismiss() }
-                                .create()
-
-                            // 3. Handle the "Save" click with validation
-                            alertDialog.setOnShowListener {
-                                val saveButton = alertDialog.getButton(android.app.AlertDialog.BUTTON_POSITIVE)
-                                saveButton.setOnClickListener {
-                                    val listName = etListName.text.toString().trim()
-
-                                    if (listName.isEmpty()) {
-                                        etListName.error = "Please enter a list name"
-                                    } else {
-                                        // SUCCESS: Save the list to your backend/database
-                                        saveListToBackend(listName, currentCartList)
-
-                                        Toast.makeText(requireContext(), "List '$listName' saved!", Toast.LENGTH_SHORT).show()
-                                        alertDialog.dismiss()
-
-                                        // Optional: Clear the current UI list after saving
-                                        currentCartList.clear()
-                                        llCartItemsContainer.removeAllViews()
-                                        tvEmptyHint.visibility = View.VISIBLE
-                                    }
-                                }
-                            }
-
-                            alertDialog.show()
-                        } else {
-                            // API test failed
-                            Toast.makeText(requireContext(), "API test failed with code ${response.statusCode}. Please try again.", Toast.LENGTH_SHORT).show()
-                            Log.e("API_ERROR", "POST test failed: ${response.errorMessage}")
+                    if (userId == null) {
+                        withContext(Dispatchers.Main) {
+                            Toast.makeText(requireContext(), "Failed to create/get user", Toast.LENGTH_SHORT).show()
                         }
+                        return@launch
+                    }
+
+                    // Now show dialog to get list name (on main thread)
+                    withContext(Dispatchers.Main) {
+                        showSaveListDialog(llCartItemsContainer, tvEmptyHint)
                     }
 
                 } catch (e: Exception) {
                     withContext(Dispatchers.Main) {
-                        Toast.makeText(requireContext(), "API test failed: ${e.message}", Toast.LENGTH_SHORT).show()
-                        Log.e("API_EXCEPTION", "POST test exception: ${e.message}")
+                        Toast.makeText(requireContext(), "Error: ${e.message}", Toast.LENGTH_SHORT).show()
+                        Log.e("SAVE_ERROR", "Exception: ${e.message}")
                     }
                 }
             }
         }
     }
 
-    // --- 3. HELPER FUNCTIONS (OUTSIDE OF ONVIEWCREATED) ---
+    // Function to ensure a user exists (create if not)
+    private suspend fun ensureUserExists() {
+        if (userId != null) return // Already have a user
 
-    // Highlight the selected store (e.g. add a border or change background color)
+        try {
+            // Try to find existing user "user1" first
+            val getUsersResponse = apiService.getUsers()
+
+            if (getUsersResponse.success) {
+                // Parse the response to find user with username "user1"
+                val usersArray = JSONArray(getUsersResponse.body)
+                for (i in 0 until usersArray.length()) {
+                    val user = usersArray.getJSONObject(i)
+                    if (user.getString("username") == "user1") {
+                        userId = user.getString("_id")
+                        Log.d("USER_FOUND", "Found existing user with ID: $userId")
+                        return
+                    }
+                }
+            }
+
+            // If user not found, create new user
+            Log.d("USER_CREATE", "Creating new user 'user1'")
+            val createResponse = apiService.createUser("user1")
+
+            if (createResponse.success) {
+                val userObj = JSONObject(createResponse.body)
+                userId = userObj.getString("_id")
+                Log.d("USER_CREATED", "Created user with ID: $userId")
+            } else {
+                Log.e("USER_ERROR", "Failed to create user: ${createResponse.errorMessage}")
+            }
+        } catch (e: Exception) {
+            Log.e("USER_ERROR", "Error in ensureUserExists: ${e.message}")
+        }
+    }
+
+    // Function to save list to backend
+    private suspend fun saveListToBackend(listName: String, items: List<CartItem>): Boolean {
+        if (userId == null) return false
+
+        try {
+            // Create JSON for items
+            val itemsArray = JSONArray()
+            items.forEach { item ->
+                val itemObj = JSONObject().apply {
+                    put("name", "${item.name} at ${item.store}")
+                    put("price", item.price)
+                }
+                itemsArray.put(itemObj)
+            }
+
+            // Create request body for shop list
+            val requestBody = JSONObject().apply {
+                put("topic", listName)
+                put("items", itemsArray)
+            }
+
+            // Make API call to create shop list
+            val response = apiService.createShopList(userId!!, requestBody)
+
+            if (response.success) {
+                Log.d("LIST_SAVED", "List saved successfully: ${response.body}")
+                return true
+            } else {
+                Log.e("LIST_ERROR", "Failed to save list: ${response.errorMessage}")
+                return false
+            }
+        } catch (e: Exception) {
+            Log.e("LIST_ERROR", "Exception saving list: ${e.message}")
+            return false
+        }
+    }
+
+    // Function to show the save list dialog
+    private fun showSaveListDialog(llCartItemsContainer: LinearLayout, tvEmptyHint: TextView) {
+        // 1. Inflate the custom dialog layout
+        val dialogView = LayoutInflater.from(requireContext()).inflate(R.layout.dialog_save_list, null)
+        val etListName = dialogView.findViewById<EditText>(R.id.etListName)
+
+        // 2. Create the AlertDialog
+        val alertDialog = android.app.AlertDialog.Builder(requireContext())
+            .setView(dialogView)
+            .setCancelable(true)
+            .setPositiveButton("Save", null)
+            .setNegativeButton("Cancel") { dialog, _ -> dialog.dismiss() }
+            .create()
+
+        // 3. Handle the "Save" click with validation
+        alertDialog.setOnShowListener {
+            val saveButton = alertDialog.getButton(android.app.AlertDialog.BUTTON_POSITIVE)
+            saveButton.setOnClickListener {
+                val listName = etListName.text.toString().trim()
+
+                if (listName.isEmpty()) {
+                    etListName.error = "Please enter a list name"
+                } else {
+                    // Disable button to prevent double clicks
+                    saveButton.isEnabled = false
+                    saveButton.text = "Saving..."
+
+                    // Save to backend in background
+                    GlobalScope.launch(Dispatchers.IO) {
+                        val success = saveListToBackend(listName, currentCartList)
+
+                        withContext(Dispatchers.Main) {
+                            if (success) {
+                                // Also save locally via ViewModel
+                                saveListToLocal(listName, currentCartList)
+
+                                Toast.makeText(requireContext(), "List '$listName' saved to cloud!", Toast.LENGTH_SHORT).show()
+                                alertDialog.dismiss()
+
+                                // Clear the current UI list after saving
+                                currentCartList.clear()
+                                llCartItemsContainer.removeAllViews()
+                                tvEmptyHint.visibility = View.VISIBLE
+                            } else {
+                                Toast.makeText(requireContext(), "Failed to save to cloud. Please try again.", Toast.LENGTH_SHORT).show()
+                                saveButton.isEnabled = true
+                                saveButton.text = "Save"
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        alertDialog.show()
+    }
+
+    // --- HELPER FUNCTIONS ---
+
+    // Highlight the selected store
     private fun highlightStore(selected: View, other1: View, other2: View) {
-        // Change background to indicate selection (Light Cyan)
         selected.setBackgroundColor(Color.parseColor("#E0F7FA"))
-
-        // Reset others to transparent or default white
         other1.setBackgroundColor(Color.TRANSPARENT)
         other2.setBackgroundColor(Color.TRANSPARENT)
     }
@@ -259,7 +350,7 @@ class AddItemsFragment : BaseFragment(R.layout.fragment_add_items) {
         v3.setBackgroundColor(Color.TRANSPARENT)
     }
 
-    private fun saveListToBackend(name: String, items: List<CartItem>) {
+    private fun saveListToLocal(name: String, items: List<CartItem>) {
         val savedItems = items.map {
             SavedItem(
                 name = it.name,

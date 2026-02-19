@@ -80,6 +80,10 @@ class ApiService(private val baseUrl: String) {
         }
         return makeRequest("/users", "POST", jsonBody)
     }
+    // Add this method to ApiService.kt
+    fun createShopList(userId: String, shopListJson: JSONObject): ApiResponse {
+        return makeRequest("/users/$userId/shoplists", "POST", shopListJson)
+    }
 
     // You can add more methods as needed
     fun getUserById(userId: String): ApiResponse {
