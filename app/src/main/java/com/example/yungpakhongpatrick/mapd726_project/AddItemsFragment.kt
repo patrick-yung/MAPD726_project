@@ -2,6 +2,7 @@ package com.example.yungpakhongpatrick.mapd726_project
 
 import android.graphics.Color
 import android.os.Bundle
+import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -14,6 +15,7 @@ import android.widget.TextView
 import android.widget.Toast
 import com.example.yungpakhongpatrick.mapd726_project.BaseFragment
 import com.example.yungpakhongpatrick.mapd726_project.R
+import kotlinx.coroutines.*
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -42,11 +44,18 @@ class AddItemsFragment : BaseFragment(R.layout.fragment_add_items) {
         "Rice (8kg)" to listOf(18.99, 17.99, 19.49)
     )
 
-    private lateinit var viewModel: ListViewModel // Define it here
+    private lateinit var viewModel: ListViewModel
+    private lateinit var apiService: ApiService
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+
         viewModel = androidx.lifecycle.ViewModelProvider(requireActivity()).get(ListViewModel::class.java)
+
+        // Initialize ApiService with base URL from strings.xml
+        val baseUrl = getString(R.string.base_url)
+        apiService = ApiService(baseUrl)
+
         // Find Views
         val etProductName = view.findViewById<AutoCompleteTextView>(R.id.etProductName)
         val tvPriceWalmart = view.findViewById<TextView>(R.id.tvPriceWalmart)
@@ -54,7 +63,6 @@ class AddItemsFragment : BaseFragment(R.layout.fragment_add_items) {
         val tvPriceSuperstore = view.findViewById<TextView>(R.id.tvPriceSuperstore)
 
         // Store Layout Containers (The colored/clickable areas)
-        // NOTE: Ensure your XML IDs match these exactly
         val containerWalmart = view.findViewById<LinearLayout>(R.id.containerWalmart) ?: view.findViewById<LinearLayout>(R.id.storeButtonsLayout).getChildAt(0) as LinearLayout
         val containerCostco = view.findViewById<LinearLayout>(R.id.containerCostco) ?: view.findViewById<LinearLayout>(R.id.storeButtonsLayout).getChildAt(1) as LinearLayout
         val containerSuperstore = view.findViewById<LinearLayout>(R.id.containerSuperstore) ?: view.findViewById<LinearLayout>(R.id.storeButtonsLayout).getChildAt(2) as LinearLayout
@@ -68,14 +76,15 @@ class AddItemsFragment : BaseFragment(R.layout.fragment_add_items) {
         val productNames = productData.keys.toList()
         val adapter = ArrayAdapter(
             requireContext(),
-            android.R.layout.simple_dropdown_item_1line, // Use this standard Android layout
-            productNames                                // This is your list of names
+            android.R.layout.simple_dropdown_item_1line,
+            productNames
         )
         etProductName.setAdapter(adapter)
 
         etProductName.setOnClickListener {
             etProductName.showDropDown()
         }
+
         // Handle selection from dropdown
         etProductName.setOnItemClickListener { parent, _, position, _ ->
             val selectedProduct = parent.getItemAtPosition(position).toString()
@@ -89,7 +98,7 @@ class AddItemsFragment : BaseFragment(R.layout.fragment_add_items) {
             }
         }
 
-        // B. Handle Store Clicks (Walmart)
+        // Handle Store Clicks (Walmart)
         containerWalmart.setOnClickListener {
             highlightStore(containerWalmart, containerCostco, containerSuperstore)
             selectedStoreName = "Walmart"
@@ -97,7 +106,7 @@ class AddItemsFragment : BaseFragment(R.layout.fragment_add_items) {
             if(priceText != "--") selectedPrice = priceText.toDouble()
         }
 
-        // C. Handle Store Clicks (Costco)
+        // Handle Store Clicks (Costco)
         containerCostco.setOnClickListener {
             highlightStore(containerCostco, containerWalmart, containerSuperstore)
             selectedStoreName = "Costco"
@@ -105,7 +114,7 @@ class AddItemsFragment : BaseFragment(R.layout.fragment_add_items) {
             if(priceText != "--") selectedPrice = priceText.toDouble()
         }
 
-        // D. Handle Store Clicks (Superstore)
+        // Handle Store Clicks (Superstore)
         containerSuperstore.setOnClickListener {
             highlightStore(containerSuperstore, containerWalmart, containerCostco)
             selectedStoreName = "Superstore"
@@ -113,8 +122,8 @@ class AddItemsFragment : BaseFragment(R.layout.fragment_add_items) {
             if(priceText != "--") selectedPrice = priceText.toDouble()
         }
 
-        // E. Add Item Button Logic
-        view.findViewById<Button>(R.id.btnAddItem).setOnClickListener {
+        // Add Item Button Logic
+        btnAddItem.setOnClickListener {
             val productName = etProductName.text.toString()
 
             if (productName.isEmpty() || selectedStoreName == null) {
@@ -137,14 +146,14 @@ class AddItemsFragment : BaseFragment(R.layout.fragment_add_items) {
                 // Add to UI List
                 val itemView = LayoutInflater.from(requireContext())
                     .inflate(R.layout.item_cart_simple, llCartItemsContainer, false)
-                itemView.findViewById<TextView>(R.id.item_name).text = itemText
-                itemView.findViewById<TextView>(R.id.item_details).visibility =
-                    View.GONE // Hide detail line as it's now in title
 
                 val tvName = itemView.findViewById<TextView>(R.id.item_name)
                 tvName.text = itemText
 
+                itemView.findViewById<TextView>(R.id.item_details).visibility = View.GONE
+
                 llCartItemsContainer.addView(itemView, 0)
+
                 // Reset UI for next item
                 etProductName.text.clear()
                 tvPriceWalmart.text = "--"
@@ -155,50 +164,80 @@ class AddItemsFragment : BaseFragment(R.layout.fragment_add_items) {
             }
         }
 
-        // Inside onViewCreated...
-
+        // Save List Button with POST test
         btnSaveList.setOnClickListener {
             if (currentCartList.isEmpty()) {
                 Toast.makeText(requireContext(), "Your list is empty!", Toast.LENGTH_SHORT).show()
                 return@setOnClickListener
             }
 
-            // 1. Inflate the custom dialog layout
-            val dialogView = LayoutInflater.from(requireContext()).inflate(R.layout.dialog_save_list, null)
-            val etListName = dialogView.findViewById<EditText>(R.id.etListName)
+            // Show loading message
+            Toast.makeText(requireContext(), "Testing API connection...", Toast.LENGTH_SHORT).show()
 
-            // 2. Create the AlertDialog
-            val alertDialog = android.app.AlertDialog.Builder(requireContext())
-                .setView(dialogView)
-                .setCancelable(true)
-                .setPositiveButton("Save", null) // Set to null first to handle validation
-                .setNegativeButton("Cancel") { dialog, _ -> dialog.dismiss() }
-                .create()
+            // Run POST test in background
+            GlobalScope.launch(Dispatchers.IO) {
+                try {
+                    // Create a test user with unique username
+                    val username = "testuser_${System.currentTimeMillis()}"
+                    val response = apiService.createUser(username)
 
-            // 3. Handle the "Save" click with validation
-            alertDialog.setOnShowListener {
-                val saveButton = alertDialog.getButton(android.app.AlertDialog.BUTTON_POSITIVE)
-                saveButton.setOnClickListener {
-                    val listName = etListName.text.toString().trim()
+                    withContext(Dispatchers.Main) {
+                        if (response.success) {
+                            // API test successful
+                            Log.d("API_SUCCESS", "POST test successful: ${response.body}")
+                            Toast.makeText(requireContext(), "API test passed! You can now save your list.", Toast.LENGTH_SHORT).show()
 
-                    if (listName.isEmpty()) {
-                        etListName.error = "Please enter a list name"
-                    } else {
-                        // SUCCESS: Save the list to your backend/database
-                        saveListToBackend(listName, currentCartList)
+                            // ORIGINAL DIALOG CODE - Now show the save dialog
+                            // 1. Inflate the custom dialog layout
+                            val dialogView = LayoutInflater.from(requireContext()).inflate(R.layout.dialog_save_list, null)
+                            val etListName = dialogView.findViewById<EditText>(R.id.etListName)
 
-                        Toast.makeText(requireContext(), "List '$listName' saved!", Toast.LENGTH_SHORT).show()
-                        alertDialog.dismiss()
+                            // 2. Create the AlertDialog
+                            val alertDialog = android.app.AlertDialog.Builder(requireContext())
+                                .setView(dialogView)
+                                .setCancelable(true)
+                                .setPositiveButton("Save", null) // Set to null first to handle validation
+                                .setNegativeButton("Cancel") { dialog, _ -> dialog.dismiss() }
+                                .create()
 
-                        // Optional: Clear the current UI list after saving
-                        currentCartList.clear()
-                        llCartItemsContainer.removeAllViews()
-                        tvEmptyHint.visibility = View.VISIBLE
+                            // 3. Handle the "Save" click with validation
+                            alertDialog.setOnShowListener {
+                                val saveButton = alertDialog.getButton(android.app.AlertDialog.BUTTON_POSITIVE)
+                                saveButton.setOnClickListener {
+                                    val listName = etListName.text.toString().trim()
+
+                                    if (listName.isEmpty()) {
+                                        etListName.error = "Please enter a list name"
+                                    } else {
+                                        // SUCCESS: Save the list to your backend/database
+                                        saveListToBackend(listName, currentCartList)
+
+                                        Toast.makeText(requireContext(), "List '$listName' saved!", Toast.LENGTH_SHORT).show()
+                                        alertDialog.dismiss()
+
+                                        // Optional: Clear the current UI list after saving
+                                        currentCartList.clear()
+                                        llCartItemsContainer.removeAllViews()
+                                        tvEmptyHint.visibility = View.VISIBLE
+                                    }
+                                }
+                            }
+
+                            alertDialog.show()
+                        } else {
+                            // API test failed
+                            Toast.makeText(requireContext(), "API test failed with code ${response.statusCode}. Please try again.", Toast.LENGTH_SHORT).show()
+                            Log.e("API_ERROR", "POST test failed: ${response.errorMessage}")
+                        }
+                    }
+
+                } catch (e: Exception) {
+                    withContext(Dispatchers.Main) {
+                        Toast.makeText(requireContext(), "API test failed: ${e.message}", Toast.LENGTH_SHORT).show()
+                        Log.e("API_EXCEPTION", "POST test exception: ${e.message}")
                     }
                 }
             }
-
-            alertDialog.show()
         }
     }
 
@@ -219,6 +258,7 @@ class AddItemsFragment : BaseFragment(R.layout.fragment_add_items) {
         v2.setBackgroundColor(Color.TRANSPARENT)
         v3.setBackgroundColor(Color.TRANSPARENT)
     }
+
     private fun saveListToBackend(name: String, items: List<CartItem>) {
         val savedItems = items.map {
             SavedItem(
