@@ -48,7 +48,7 @@ class AddItemsFragment : BaseFragment(R.layout.fragment_add_items) {
 
     private lateinit var viewModel: ListViewModel
     private lateinit var apiService: ApiService
-    private var userId: String? = null // Will store the user ID after creation/fetch
+    private val FIXED_USER_ID = "699ca617078ad1971ca67c11" // Replace with your actual user1 ID
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
@@ -58,6 +58,8 @@ class AddItemsFragment : BaseFragment(R.layout.fragment_add_items) {
         // Initialize ApiService with base URL from strings.xml
         val baseUrl = getString(R.string.base_url)
         apiService = ApiService(baseUrl)
+        Log.d("AddItemsFragment", "Base URL: $baseUrl")
+        Log.d("AddItemsFragment", "Using fixed user ID: $FIXED_USER_ID")
 
         // Find Views
         val etProductName = view.findViewById<AutoCompleteTextView>(R.id.etProductName)
@@ -166,94 +168,35 @@ class AddItemsFragment : BaseFragment(R.layout.fragment_add_items) {
             }
         }
 
-        // Save List Button - Now saves to backend
+        // Save List Button - Using fixed user ID
         btnSaveList.setOnClickListener {
             if (currentCartList.isEmpty()) {
                 Toast.makeText(requireContext(), "Your list is empty!", Toast.LENGTH_SHORT).show()
                 return@setOnClickListener
             }
 
-            // Show loading message
-            Toast.makeText(requireContext(), "Saving your list...", Toast.LENGTH_SHORT).show()
-
-            // Run in background
-            GlobalScope.launch(Dispatchers.IO) {
-                try {
-                    // First, ensure we have a user (create or get existing)
-                    ensureUserExists()
-
-                    if (userId == null) {
-                        withContext(Dispatchers.Main) {
-                            Toast.makeText(requireContext(), "Failed to create/get user", Toast.LENGTH_SHORT).show()
-                        }
-                        return@launch
-                    }
-
-                    // Now show dialog to get list name (on main thread)
-                    withContext(Dispatchers.Main) {
-                        showSaveListDialog(llCartItemsContainer, tvEmptyHint)
-                    }
-
-                } catch (e: Exception) {
-                    withContext(Dispatchers.Main) {
-                        Toast.makeText(requireContext(), "Error: ${e.message}", Toast.LENGTH_SHORT).show()
-                        Log.e("SAVE_ERROR", "Exception: ${e.message}")
-                    }
-                }
-            }
+            // Show dialog to get list name
+            showSaveListDialog(llCartItemsContainer, tvEmptyHint)
         }
     }
 
-    // Function to ensure a user exists (create if not)
-    private suspend fun ensureUserExists() {
-        if (userId != null) return // Already have a user
-
-        try {
-            // Try to find existing user "user1" first
-            val getUsersResponse = apiService.getUsers()
-
-            if (getUsersResponse.success) {
-                // Parse the response to find user with username "user1"
-                val usersArray = JSONArray(getUsersResponse.body)
-                for (i in 0 until usersArray.length()) {
-                    val user = usersArray.getJSONObject(i)
-                    if (user.getString("username") == "user1") {
-                        userId = user.getString("_id")
-                        Log.d("USER_FOUND", "Found existing user with ID: $userId")
-                        return
-                    }
-                }
-            }
-
-            // If user not found, create new user
-            Log.d("USER_CREATE", "Creating new user 'user1'")
-            val createResponse = apiService.createUser("user1")
-
-            if (createResponse.success) {
-                val userObj = JSONObject(createResponse.body)
-                userId = userObj.getString("_id")
-                Log.d("USER_CREATED", "Created user with ID: $userId")
-            } else {
-                Log.e("USER_ERROR", "Failed to create user: ${createResponse.errorMessage}")
-            }
-        } catch (e: Exception) {
-            Log.e("USER_ERROR", "Error in ensureUserExists: ${e.message}")
-        }
-    }
-
-    // Function to save list to backend
+    // Function to save list to backend - using fixed user ID
     private suspend fun saveListToBackend(listName: String, items: List<CartItem>): Boolean {
-        if (userId == null) return false
+        return try {
+            Log.d("SAVE", "=== Starting save process ===")
+            Log.d("SAVE", "List name: $listName")
+            Log.d("SAVE", "Number of items: ${items.size}")
+            Log.d("SAVE", "Using fixed user ID: $FIXED_USER_ID")
 
-        try {
             // Create JSON for items
             val itemsArray = JSONArray()
-            items.forEach { item ->
+            items.forEachIndexed { index, item ->
                 val itemObj = JSONObject().apply {
                     put("name", "${item.name} at ${item.store}")
                     put("price", item.price)
                 }
                 itemsArray.put(itemObj)
+                Log.d("SAVE", "  Item ${index + 1}: ${item.name} at ${item.store} - $${item.price}")
             }
 
             // Create request body for shop list
@@ -262,19 +205,26 @@ class AddItemsFragment : BaseFragment(R.layout.fragment_add_items) {
                 put("items", itemsArray)
             }
 
+            Log.d("SAVE", "Request body: $requestBody")
+            Log.d("SAVE", "Sending POST to: /users/$FIXED_USER_ID/shoplists")
+
             // Make API call to create shop list
-            val response = apiService.createShopList(userId!!, requestBody)
+            val response = apiService.createShopList(FIXED_USER_ID, requestBody)
+
+            Log.d("SAVE", "Create shop list response - Success: ${response.success}, Code: ${response.statusCode}")
+            Log.d("SAVE", "Response body: ${response.body}")
+            Log.d("SAVE", "Error message: ${response.errorMessage}")
 
             if (response.success) {
-                Log.d("LIST_SAVED", "List saved successfully: ${response.body}")
-                return true
+                Log.d("SAVE", "✓ List saved successfully!")
+                true
             } else {
-                Log.e("LIST_ERROR", "Failed to save list: ${response.errorMessage}")
-                return false
+                Log.e("SAVE", "✗ Failed to save list. Code: ${response.statusCode}")
+                false
             }
         } catch (e: Exception) {
-            Log.e("LIST_ERROR", "Exception saving list: ${e.message}")
-            return false
+            Log.e("SAVE", "✗ Exception in saveListToBackend", e)
+            false
         }
     }
 
@@ -322,7 +272,7 @@ class AddItemsFragment : BaseFragment(R.layout.fragment_add_items) {
                                 llCartItemsContainer.removeAllViews()
                                 tvEmptyHint.visibility = View.VISIBLE
                             } else {
-                                Toast.makeText(requireContext(), "Failed to save to cloud. Please try again.", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(requireContext(), "Failed to save to cloud. Please check Logcat for details.", Toast.LENGTH_LONG).show()
                                 saveButton.isEnabled = true
                                 saveButton.text = "Save"
                             }
@@ -337,7 +287,6 @@ class AddItemsFragment : BaseFragment(R.layout.fragment_add_items) {
 
     // --- HELPER FUNCTIONS ---
 
-    // Highlight the selected store
     private fun highlightStore(selected: View, other1: View, other2: View) {
         selected.setBackgroundColor(Color.parseColor("#E0F7FA"))
         other1.setBackgroundColor(Color.TRANSPARENT)

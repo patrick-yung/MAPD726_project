@@ -80,10 +80,6 @@ class ApiService(private val baseUrl: String) {
         }
         return makeRequest("/users", "POST", jsonBody)
     }
-    // Add this method to ApiService.kt
-    fun createShopList(userId: String, shopListJson: JSONObject): ApiResponse {
-        return makeRequest("/users/$userId/shoplists", "POST", shopListJson)
-    }
 
     // You can add more methods as needed
     fun getUserById(userId: String): ApiResponse {
@@ -99,5 +95,12 @@ class ApiService(private val baseUrl: String) {
 
     fun deleteUser(userId: String): ApiResponse {
         return makeRequest("/users/$userId", "DELETE")
+    }
+    // Add this method to your ApiService.kt
+    fun getShopLists(userId: String): ApiResponse {
+        return makeRequest("/users/$userId/shoplists", "GET")
+    }
+    fun createShopList(userId: String, shopListJson: JSONObject): ApiResponse {
+        return makeRequest("/users/$userId/shoplists", "POST", shopListJson)
     }
 }
