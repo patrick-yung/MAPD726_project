@@ -25,12 +25,14 @@ class MainActivity : AppCompatActivity() {
             insets
         }
 
-       // 1. Find the Bottom Navigation Bar
+        // 1. Find the Bottom Navigation Bar
         val bottomNav = findViewById<BottomNavigationView>(R.id.bottom_navigation)
 
-        // 2. Load HomeFragment AUTOMATICALLY when the app starts
+        // 2. ALWAYS load the Login Screen when the app opens
         if (savedInstanceState == null) {
-            loadFragment(HomeFragment())
+            supportFragmentManager.beginTransaction()
+                .replace(R.id.fragment_container, LogInFragment())
+                .commit()
         }
         // 3. The "Switching" Logic
         bottomNav.setOnItemSelectedListener { item ->
