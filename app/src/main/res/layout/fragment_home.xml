@@ -19,7 +19,7 @@
         android:id="@+id/tvAppTitle"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="SmartCart"
+        android:text="@string/appName"
         android:textColor="@color/white"
         android:textSize="24sp"
         android:textStyle="bold"
@@ -36,7 +36,7 @@
         android:id="@+id/tvSubtitle"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Shop Smart, Save More"
+        android:text="@string/subText"
         android:textColor="#E0E0E0"
         android:textSize="14sp"
         app:layout_constraintBottom_toBottomOf="@+id/headerBackground"
@@ -70,7 +70,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginStart="12dp"
-                android:text="Search products..."
+                android:text="@string/searchText"
                 android:textColor="#888888"
                 android:textSize="16sp" />
         </LinearLayout>
@@ -96,7 +96,7 @@
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Compare Prices Across Stores"
+                android:text="@string/compareText"
                 android:textColor="@color/white"
                 android:textSize="18sp"
                 android:textStyle="bold"
@@ -108,7 +108,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="12dp"
                 android:backgroundTint="@color/white"
-                android:text="Start Comparing >"
+                android:text="@string/compareBtn"
                 android:textColor="@color/smart_cart_orange"
                 android:textStyle="bold" />
         </LinearLayout>
@@ -118,7 +118,7 @@
         android:id="@+id/tvListHeader"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Previous Shopping Lists"
+        android:text="@string/previousListText"
         android:textColor="#222222"
         android:textSize="18sp"
         android:textStyle="bold"

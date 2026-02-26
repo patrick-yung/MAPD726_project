@@ -35,4 +35,12 @@ class HomeFragment : Fragment() {
         }
 
     }
+
+    override fun onResume() {
+        super.onResume()
+
+        // Bring the bottom menu back for the Home Screen!
+        val bottomNav = requireActivity().findViewById<android.view.View>(R.id.bottom_navigation)
+        bottomNav?.visibility = android.view.View.VISIBLE
+    }
 }

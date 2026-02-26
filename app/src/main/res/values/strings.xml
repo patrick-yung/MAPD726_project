@@ -3,4 +3,35 @@
     <string name="base_url">https://mapd713-group-project.onrender.com</string>
     <!-- TODO: Remove or change this placeholder text -->
     <string name="hello_blank_fragment">Hello blank fragment</string>
+    <string name="appName">SmartCart</string>
+    <string name="subText">Shop Smart, Save More</string>
+    <string name="searchText">Search products...</string>
+    <string name="compareText">Compare Prices Across Stores</string>
+    <string name="compareBtn"><![CDATA[Start Comparing >]]></string>
+    <string name="previousListText">Previous Shopping Lists</string>
+    <string name="addItemsHeader">Build Your List</string>
+    <string name="selectItemText">Your list is empty. Select a product below!</string>
+    <string name="searchProductText">Search product (e.g. Milk)</string>
+    <string name="walmart">Walmart</string>
+    <string name="costco">Costco</string>
+    <string name="superstore">Superstore</string>
+    <string name="addItemBtn">Add Item</string>
+    <string name="saveListBtn">Save List</string>
+    <string name="price_comparison">Price Comparison</string>
+    <string name="best_deal">Best Deal:</string>
+    <string name="costco1">Costco</string>
+    <string name="unit_price">Unit Price: $0.50 / L</string>
+    <string name="costco2">Costco</string>
+    <string name="dealsHeader">Weekly deals</string>
+    <string name="listHeader">My Shopping List</string>
+    <string name="estimated_total">Estimated Total</string>
+    <string name="_0_00">$0.00</string>
+    <string name="listDetailsHeader">List Details</string>
+    <string name="no_items_in_this_list">No items in this list</string>
+    <string name="username">Enter your Username</string>
+    <string name="loginBtn">Login</string>
+    <string name="registerText">Don\'t have an account? Tap here to register.</string>
+    <string name="product_name">Product Name</string>
+    <string name="details">Details</string>
+    <string name="weekly_groceries">Weekly Groceries</string>
 </resources>

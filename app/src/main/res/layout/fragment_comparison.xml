@@ -29,7 +29,7 @@
         android:id="@+id/tvTitle"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Price Comparison"
+        android:text="@string/price_comparison"
         android:textColor="@color/white"
         android:textSize="20sp"
         android:textStyle="bold"
@@ -44,7 +44,7 @@
         android:clipToPadding="false"
         android:paddingBottom="20dp"
         app:layout_constraintTop_toBottomOf="@+id/headerBackground">
-<!--        app:layout_constraintBottom_toTopOf="@+id/btnAddToList">-->
+
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -73,13 +73,13 @@
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="Best Deal: "
+                            android:text="@string/best_deal"
                             android:textSize="18sp"
                             android:textColor="#333333"/>
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="Costco"
+                            android:text="@string/costco1"
                             android:textSize="18sp"
                             android:textStyle="bold"
                             android:textColor="#E31837"/>
@@ -88,7 +88,7 @@
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="Unit Price: $0.50 / L"
+                        android:text="@string/unit_price"
                         android:textSize="16sp"
                         android:layout_marginTop="4dp"
                         android:textColor="#333333"/>
@@ -115,7 +115,7 @@
                         <TextView
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:text="Costco"
+                            android:text="@string/costco2"
                             android:textColor="#FFFFFF"
                             android:textSize="18sp"
                             android:textStyle="bold"/>
