@@ -30,7 +30,7 @@
         android:id="@+id/etLoginUsername"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:hint="Enter your Username"
+        android:hint="@string/username"
         android:inputType="text"
         android:padding="16dp"
         android:background="@android:drawable/editbox_background"
@@ -42,7 +42,7 @@
         android:layout_height="wrap_content"
         app:backgroundTint="@color/smart_cart_green"
         android:textColor="@android:color/white"
-        android:text="Login"
+        android:text="@string/loginBtn"
         android:padding="16dp"
         android:layout_marginBottom="16dp"/>
 
@@ -50,7 +50,7 @@
         android:id="@+id/tvRegisterPrompt"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Don't have an account? Tap here to register."
+        android:text="@string/registerText"
         android:textColor="@color/smart_cart_orange"
         android:textStyle="bold"
         android:padding="8dp"/>
