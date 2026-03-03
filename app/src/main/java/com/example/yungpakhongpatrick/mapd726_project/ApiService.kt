@@ -81,7 +81,6 @@ class ApiService(private val baseUrl: String) {
         return makeRequest("/users", "POST", jsonBody)
     }
 
-    // You can add more methods as needed
     fun getUserById(userId: String): ApiResponse {
         return makeRequest("/users/$userId", "GET")
     }
@@ -96,11 +95,23 @@ class ApiService(private val baseUrl: String) {
     fun deleteUser(userId: String): ApiResponse {
         return makeRequest("/users/$userId", "DELETE")
     }
-    // Add this method to your ApiService.kt
+
+    // Shop list methods
     fun getShopLists(userId: String): ApiResponse {
         return makeRequest("/users/$userId/shoplists", "GET")
     }
+
     fun createShopList(userId: String, shopListJson: JSONObject): ApiResponse {
         return makeRequest("/users/$userId/shoplists", "POST", shopListJson)
+    }
+
+    // NEW: Update an existing shop list
+    fun updateShopList(userId: String, listId: String, shopListJson: JSONObject): ApiResponse {
+        return makeRequest("/users/$userId/shoplists/$listId", "PUT", shopListJson)
+    }
+
+    // Optional: Delete a shop list
+    fun deleteShopList(userId: String, listId: String): ApiResponse {
+        return makeRequest("/users/$userId/shoplists/$listId", "DELETE")
     }
 }

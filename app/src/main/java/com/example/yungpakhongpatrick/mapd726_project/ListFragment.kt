@@ -3,39 +3,73 @@ package com.example.yungpakhongpatrick.mapd726_project
 import android.os.Bundle
 import android.util.Log
 import android.view.View
+import android.widget.ImageView
+import android.widget.TextView
 import android.widget.Toast
+import androidx.lifecycle.ViewModelProvider
+import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
 import com.example.yungpakhongpatrick.mapd726_project.R
 import kotlinx.coroutines.*
 import org.json.JSONArray
 import org.json.JSONObject
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 class ListFragment : BaseFragment(R.layout.fragment_list) {
     private lateinit var listViewModel: ListViewModel
     private lateinit var apiService: ApiService
-    private val FIXED_USER_ID = "699ca617078ad1971ca67c11" // Your user ID
+    private lateinit var sessionManager: SessionManager
+    private var currentUserId: String = ""
     private val TAG = "ListFragment"
+
+    // Views
+    private lateinit var rvShoppingList: RecyclerView
+    private lateinit var tvTotalAmount: TextView
+    private lateinit var btnBackArrow: ImageView
+    private lateinit var tvListTitle: TextView
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
         Log.d(TAG, "=== ListFragment onViewCreated ===")
 
+        // Initialize SessionManager and get user ID
+        sessionManager = SessionManager(requireContext())
+
+        if (!sessionManager.isLoggedIn()) {
+            Log.e(TAG, "User not logged in!")
+            navigateToLogin()
+            return
+        }
+
+        currentUserId = sessionManager.getUserId() ?: run {
+            Log.e(TAG, "No user ID found!")
+            navigateToLogin()
+            return
+        }
+
+        Log.d(TAG, "Current User ID: $currentUserId")
+
+        // Initialize views
+        initViews(view)
+
         // Initialize ViewModel
-        listViewModel = androidx.lifecycle.ViewModelProvider(requireActivity()).get(ListViewModel::class.java)
+        listViewModel = ViewModelProvider(requireActivity())[ListViewModel::class.java]
 
         // Initialize ApiService
         val baseUrl = getString(R.string.base_url)
         apiService = ApiService(baseUrl)
         Log.d(TAG, "ApiService initialized with baseUrl: $baseUrl")
-        Log.d(TAG, "Fixed User ID: $FIXED_USER_ID")
 
-        val rvShoppingList = view.findViewById<androidx.recyclerview.widget.RecyclerView>(R.id.rvShoppingList)
-        val tvTotalAmount = view.findViewById<android.widget.TextView>(R.id.tvTotalAmount)
+        // Set up back button
+        btnBackArrow.setOnClickListener {
+            parentFragmentManager.popBackStack()
+        }
 
-        Log.d(TAG, "Views found: rvShoppingList=${rvShoppingList != null}, tvTotalAmount=${tvTotalAmount != null}")
-
-        // Set up layout manager (this stays the same)
-        rvShoppingList.layoutManager = androidx.recyclerview.widget.LinearLayoutManager(requireContext())
+        // Set up layout manager
+        rvShoppingList.layoutManager = LinearLayoutManager(requireContext())
 
         // Observe ViewModel for updates
         listViewModel.allShoppingLists.observe(viewLifecycleOwner) { updatedLists ->
@@ -63,13 +97,23 @@ class ListFragment : BaseFragment(R.layout.fragment_list) {
         fetchListsFromBackend()
     }
 
-    private fun fetchListsFromBackend() {
-        Log.d(TAG, "=== fetchListsFromBackend() called ===")
+    private fun initViews(view: View) {
+        rvShoppingList = view.findViewById(R.id.rvShoppingList)
+        tvTotalAmount = view.findViewById(R.id.tvTotalAmount)
+        btnBackArrow = view.findViewById(R.id.btnBackArrow)
+        tvListTitle = view.findViewById(R.id.tvListTitle)
 
-        GlobalScope.launch(Dispatchers.IO) {
+        // Set the title
+        tvListTitle.text = "My Shopping Lists"
+    }
+
+    private fun fetchListsFromBackend() {
+        Log.d(TAG, "=== fetchListsFromBackend() called for user: $currentUserId ===")
+
+        CoroutineScope(Dispatchers.IO).launch {
             try {
                 Log.d(TAG, "Making API call to getShopLists()")
-                val response = apiService.getShopLists(FIXED_USER_ID)
+                val response = apiService.getShopLists(currentUserId)
 
                 Log.d(TAG, "API Response - Success: ${response.success}, Code: ${response.statusCode}")
                 Log.d(TAG, "Response body: ${response.body}")
@@ -85,7 +129,13 @@ class ListFragment : BaseFragment(R.layout.fragment_list) {
                         }
                     } else {
                         Log.e(TAG, "Failed to fetch lists: ${response.errorMessage}")
-                        Toast.makeText(requireContext(), "Failed to load from cloud", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(requireContext(), "Failed to load from cloud: ${response.statusCode}", Toast.LENGTH_SHORT).show()
+
+                        // Handle unauthorized - session might have expired
+                        if (response.statusCode == 401 || response.statusCode == 403) {
+                            sessionManager.clearSession()
+                            navigateToLogin()
+                        }
                     }
                 }
             } catch (e: Exception) {
@@ -120,6 +170,13 @@ class ListFragment : BaseFragment(R.layout.fragment_list) {
                     val itemName = itemObj.getString("name")
                     val itemPrice = itemObj.getDouble("price")
 
+                    // Get checked state if it exists
+                    val isChecked = if (itemObj.has("isChecked")) {
+                        itemObj.getBoolean("isChecked")
+                    } else {
+                        false
+                    }
+
                     // Parse store from item name
                     val store = if (itemName.contains(" at ")) {
                         itemName.substringAfter(" at ")
@@ -138,14 +195,22 @@ class ListFragment : BaseFragment(R.layout.fragment_list) {
                             name = name,
                             price = itemPrice,
                             store = store,
-                            isChecked = false
+                            isChecked = isChecked
                         )
                     )
                 }
 
-                // Format date
-                val formattedDate = java.text.SimpleDateFormat("MMM d, yyyy", java.util.Locale.getDefault())
-                    .format(java.util.Date())
+                // Get date from backend if available
+                val formattedDate = if (listObj.has("createdDate")) {
+                    try {
+                        val dateStr = listObj.getString("createdDate")
+                        formatDateFromBackend(dateStr)
+                    } catch (e: Exception) {
+                        SimpleDateFormat("MMM d, yyyy", Locale.getDefault()).format(Date())
+                    }
+                } else {
+                    SimpleDateFormat("MMM d, yyyy", Locale.getDefault()).format(Date())
+                }
 
                 val savedList = SavedList(
                     id = localId,
@@ -163,10 +228,36 @@ class ListFragment : BaseFragment(R.layout.fragment_list) {
                     listViewModel.addList(savedList)
                 } else {
                     Log.d(TAG, "List already exists in ViewModel: $topic")
+                    // Optionally update if needed
+                    val existingList = existingLists.first { it.id == localId }
+                    if (existingList.items.size != savedItems.size) {
+                        Log.d(TAG, "Item count differs, updating list")
+                        listViewModel.updateList(savedList)
+                    }
                 }
             }
         } catch (e: Exception) {
             Log.e(TAG, "Error parsing lists", e)
+        }
+    }
+
+    private fun formatDateFromBackend(dateString: String): String {
+        return try {
+            val isoFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.getDefault())
+            isoFormat.timeZone = java.util.TimeZone.getTimeZone("UTC")
+            val date = isoFormat.parse(dateString)
+            val outputFormat = SimpleDateFormat("MMM d, yyyy", Locale.getDefault())
+            outputFormat.format(date ?: Date())
+        } catch (e: Exception) {
+            try {
+                val altFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.getDefault())
+                altFormat.timeZone = java.util.TimeZone.getTimeZone("UTC")
+                val date = altFormat.parse(dateString)
+                val outputFormat = SimpleDateFormat("MMM d, yyyy", Locale.getDefault())
+                outputFormat.format(date ?: Date())
+            } catch (e2: Exception) {
+                SimpleDateFormat("MMM d, yyyy", Locale.getDefault()).format(Date())
+            }
         }
     }
 
@@ -182,5 +273,16 @@ class ListFragment : BaseFragment(R.layout.fragment_list) {
         } catch (e: Exception) {
             Log.e(TAG, "Error opening list details", e)
         }
+    }
+
+    private fun navigateToLogin() {
+        parentFragmentManager.beginTransaction()
+            .replace(R.id.fragment_container, LogInFragment())
+            .commit()
+    }
+
+    override fun onDestroyView() {
+        super.onDestroyView()
+        // Clean up if needed
     }
 }
