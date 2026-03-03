@@ -12,7 +12,7 @@ import org.json.JSONObject
 class ListFragment : BaseFragment(R.layout.fragment_list) {
     private lateinit var listViewModel: ListViewModel
     private lateinit var apiService: ApiService
-    private val FIXED_USER_ID = "699ca617078ad1971ca67c11" // Your user ID
+    private val FIXED_USER_ID = "69a73ea3f2f9ecd01c7bcbf2" // Your user ID
     private val TAG = "ListFragment"
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {

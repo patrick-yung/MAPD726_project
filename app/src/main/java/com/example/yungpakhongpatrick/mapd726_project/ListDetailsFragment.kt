@@ -11,12 +11,15 @@ import androidx.recyclerview.widget.RecyclerView
 import kotlinx.coroutines.*
 import org.json.JSONArray
 import org.json.JSONObject
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 class ListDetailsFragment : BaseFragment(R.layout.fragment_list_details) {
 
     private lateinit var viewModel: ListViewModel
     private lateinit var apiService: ApiService
-    private val FIXED_USER_ID = "699ca617078ad1971ca67c11" // Your user ID
+    private val FIXED_USER_ID = "69a73ea3f2f9ecd01c7bcbf2" // Your user ID
     private var currentListId: Long = 0L
     private var fetchJob: Job? = null
 
@@ -47,7 +50,6 @@ class ListDetailsFragment : BaseFragment(R.layout.fragment_list_details) {
         }
 
         Log.d(TAG, "Current List ID (local): $currentListId")
-        Log.d(TAG, "Converting backend ID to local ID: If backend ID was 'xyz', local ID would be: ${"xyz".hashCode().toLong()}")
 
         // Initialize ViewModel
         viewModel = ViewModelProvider(requireActivity())[ListViewModel::class.java]
@@ -90,7 +92,7 @@ class ListDetailsFragment : BaseFragment(R.layout.fragment_list_details) {
             } else {
                 Log.d(TAG, "Lists in ViewModel:")
                 allLists.forEachIndexed { index, list ->
-                    Log.d(TAG, "  [$index] ID: ${list.id}, Name: ${list.name}, Items: ${list.items.size}")
+                    Log.d(TAG, "  [$index] ID: ${list.id}, Name: ${list.name}, Date: ${list.date}, Items: ${list.items.size}")
                 }
             }
 
@@ -198,10 +200,18 @@ class ListDetailsFragment : BaseFragment(R.layout.fragment_list_details) {
                 val itemsCount = listObj.getJSONArray("items").length()
                 val localId = backendId.hashCode().toLong()
 
+                // Check if the list has a createdDate field
+                val createdDate = if (listObj.has("createdDate")) {
+                    listObj.getString("createdDate")
+                } else {
+                    null
+                }
+
                 Log.d(TAG, "Backend List $i:")
                 Log.d(TAG, "  Backend ID: $backendId")
                 Log.d(TAG, "  Local ID (hashCode): $localId")
                 Log.d(TAG, "  Topic: $topic")
+                Log.d(TAG, "  Created Date: $createdDate")
                 Log.d(TAG, "  Items count: $itemsCount")
 
                 // Check if this matches our current list
@@ -220,6 +230,22 @@ class ListDetailsFragment : BaseFragment(R.layout.fragment_list_details) {
 
                 Log.d(TAG, "Processing list $i: $topic (backend: $backendListId, local: $localId)")
 
+                // Parse the created date from backend
+                var formattedDate = "Unknown date"
+                if (listObj.has("createdDate")) {
+                    try {
+                        val createdDateStr = listObj.getString("createdDate")
+                        formattedDate = formatDateFromBackend(createdDateStr)
+                        Log.d(TAG, "  Parsed date from backend: $createdDateStr -> $formattedDate")
+                    } catch (e: Exception) {
+                        Log.e(TAG, "  Error parsing date", e)
+                        formattedDate = SimpleDateFormat("MMM d, yyyy", Locale.getDefault()).format(Date())
+                    }
+                } else {
+                    Log.d(TAG, "  No createdDate field found, using current date")
+                    formattedDate = SimpleDateFormat("MMM d, yyyy", Locale.getDefault()).format(Date())
+                }
+
                 // Parse items
                 val itemsArray = listObj.getJSONArray("items")
                 val savedItems = mutableListOf<SavedItem>()
@@ -228,6 +254,13 @@ class ListDetailsFragment : BaseFragment(R.layout.fragment_list_details) {
                     val itemObj = itemsArray.getJSONObject(j)
                     val itemName = itemObj.getString("name")
                     val itemPrice = itemObj.getDouble("price")
+
+                    // Parse the isChecked field from backend (default to false if not present)
+                    val isChecked = if (itemObj.has("isChecked")) {
+                        itemObj.getBoolean("isChecked")
+                    } else {
+                        false
+                    }
 
                     // Parse store from item name
                     val store = if (itemName.contains(" at ")) {
@@ -247,14 +280,10 @@ class ListDetailsFragment : BaseFragment(R.layout.fragment_list_details) {
                             name = name,
                             price = itemPrice,
                             store = store,
-                            isChecked = false
+                            isChecked = isChecked
                         )
                     )
                 }
-
-                // Format date
-                val formattedDate = java.text.SimpleDateFormat("MMM d, yyyy", java.util.Locale.getDefault())
-                    .format(java.util.Date())
 
                 val savedList = SavedList(
                     id = localId,
@@ -270,14 +299,21 @@ class ListDetailsFragment : BaseFragment(R.layout.fragment_list_details) {
                 if (existingList == null) {
                     Log.d(TAG, "  ➕ List not in ViewModel, adding...")
                     viewModel.addList(savedList)
-                    Log.d(TAG, "  ✓ Added to ViewModel: $topic")
+                    Log.d(TAG, "  ✓ Added to ViewModel: $topic with date: $formattedDate")
 
                     if (localId == currentListId) {
                         Log.d(TAG, "  ⭐ This was our current list!")
                     }
                 } else {
                     Log.d(TAG, "  ✓ List already in ViewModel, skipping")
+                    Log.d(TAG, "    Existing date: ${existingList.date}, New date: $formattedDate")
                     Log.d(TAG, "    Existing items: ${existingList.items.size}, New items: ${savedItems.size}")
+
+                    // Optionally update the list if needed
+                    if (existingList.date != formattedDate) {
+                        Log.d(TAG, "    Date mismatch, updating...")
+                        // You might want to update the existing list here
+                    }
                 }
             }
 
@@ -286,6 +322,33 @@ class ListDetailsFragment : BaseFragment(R.layout.fragment_list_details) {
         } catch (e: Exception) {
             Log.e(TAG, "❌ Error parsing JSON", e)
             Log.e(TAG, "JSON that caused error: $jsonResponse")
+        }
+    }
+
+    private fun formatDateFromBackend(dateString: String): String {
+        return try {
+            // Try to parse ISO date format (e.g., "2024-03-15T10:30:00.000Z")
+            val isoFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.getDefault())
+            isoFormat.timeZone = java.util.TimeZone.getTimeZone("UTC")
+            val date = isoFormat.parse(dateString)
+
+            // Format to "MMM d, yyyy" (e.g., "Mar 15, 2024")
+            val outputFormat = SimpleDateFormat("MMM d, yyyy", Locale.getDefault())
+            outputFormat.format(date ?: Date())
+        } catch (e: Exception) {
+            try {
+                // Try alternative format without milliseconds
+                val altFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.getDefault())
+                altFormat.timeZone = java.util.TimeZone.getTimeZone("UTC")
+                val date = altFormat.parse(dateString)
+
+                val outputFormat = SimpleDateFormat("MMM d, yyyy", Locale.getDefault())
+                outputFormat.format(date ?: Date())
+            } catch (e2: Exception) {
+                Log.e(TAG, "Error parsing date: $dateString", e2)
+                // Fallback to current date
+                SimpleDateFormat("MMM d, yyyy", Locale.getDefault()).format(Date())
+            }
         }
     }
 
