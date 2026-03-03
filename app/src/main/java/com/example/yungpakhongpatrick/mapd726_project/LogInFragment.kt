@@ -14,9 +14,16 @@ import org.json.JSONObject
 class LogInFragment : BaseFragment(R.layout.fragment_log_in) {
 
     private lateinit var apiService: ApiService
+    private lateinit var sessionManager: SessionManager
+    private val TAG = "LogInFragment"
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+
+        // Initialize SessionManager
+        sessionManager = SessionManager(requireContext())
+
+        // REMOVED the auto-login check - user must always log in
 
         val baseUrl = getString(R.string.base_url)
         apiService = ApiService(baseUrl)
@@ -46,7 +53,7 @@ class LogInFragment : BaseFragment(R.layout.fragment_log_in) {
         btnLogin.isEnabled = false
         btnLogin.text = "Connecting..."
 
-        GlobalScope.launch(Dispatchers.IO) {
+        CoroutineScope(Dispatchers.IO).launch {
             try {
                 // Step 1: Check if user already exists
                 val getResponse = apiService.getUsers()
@@ -62,7 +69,7 @@ class LogInFragment : BaseFragment(R.layout.fragment_log_in) {
                     val createResponse = apiService.createUser(username)
 
                     if (createResponse.success) {
-                        // Assuming  backend returns the new user object with the _id
+                        // Assuming backend returns the new user object with the _id
                         val newUserObj = JSONObject(createResponse.body)
                         userId = newUserObj.optString("_id")
                     }
@@ -71,13 +78,17 @@ class LogInFragment : BaseFragment(R.layout.fragment_log_in) {
                 // Step 3: Complete login and navigate
                 withContext(Dispatchers.Main) {
                     if (userId != null && userId.isNotEmpty()) {
+                        // Save user session using SessionManager (still save for this session)
+                        sessionManager.saveUserSession(userId, username)
+
+                        // Also save in SharedPreferences for backward compatibility
                         saveUserIdLocally(userId)
+
+                        Log.d(TAG, "User logged in: $username with ID: $userId")
                         Toast.makeText(requireContext(), "Welcome, $username!", Toast.LENGTH_SHORT).show()
 
-                        // Swap out the LoginFragment for the AddItemsFragment
-                        parentFragmentManager.beginTransaction()
-                            .replace(R.id.fragment_container, HomeFragment())
-                            .commit()
+                        // Navigate to HomeFragment
+                        navigateToHome()
                     } else {
                         Toast.makeText(requireContext(), "Failed to connect to server.", Toast.LENGTH_LONG).show()
                     }
@@ -87,8 +98,8 @@ class LogInFragment : BaseFragment(R.layout.fragment_log_in) {
 
             } catch (e: Exception) {
                 withContext(Dispatchers.Main) {
-                    Log.e("LoginFragment", "Error", e)
-                    Toast.makeText(requireContext(), "Network error", Toast.LENGTH_SHORT).show()
+                    Log.e(TAG, "Error during login", e)
+                    Toast.makeText(requireContext(), "Network error: ${e.message}", Toast.LENGTH_SHORT).show()
                     btnLogin.isEnabled = true
                     btnLogin.text = "Login"
                 }
@@ -97,7 +108,7 @@ class LogInFragment : BaseFragment(R.layout.fragment_log_in) {
     }
 
     private fun extractUserId(jsonString: String, targetUsername: String): String? {
-        try {
+        return try {
             val jsonArray = JSONArray(jsonString)
             for (i in 0 until jsonArray.length()) {
                 val userObj = jsonArray.getJSONObject(i)
@@ -105,14 +116,21 @@ class LogInFragment : BaseFragment(R.layout.fragment_log_in) {
                     return userObj.optString("_id")
                 }
             }
+            null
         } catch (e: Exception) {
-            Log.e("LoginFragment", "Parse error", e)
+            Log.e(TAG, "Parse error", e)
+            null
         }
-        return null
     }
 
     private fun saveUserIdLocally(userId: String) {
         val sharedPrefs = requireActivity().getSharedPreferences("SmartCartPrefs", Context.MODE_PRIVATE)
         sharedPrefs.edit().putString("CURRENT_USER_ID", userId).apply()
+    }
+
+    private fun navigateToHome() {
+        parentFragmentManager.beginTransaction()
+            .replace(R.id.fragment_container, HomeFragment())
+            .commit()
     }
 }

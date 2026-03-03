@@ -48,10 +48,28 @@ class AddItemsFragment : BaseFragment(R.layout.fragment_add_items) {
 
     private lateinit var viewModel: ListViewModel
     private lateinit var apiService: ApiService
-    private val FIXED_USER_ID = "69a73ea3f2f9ecd01c7bcbf2" // Replace with your actual user1 ID
+    private lateinit var sessionManager: SessionManager
+    private var currentUserId: String = ""
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+
+        // Initialize SessionManager and get user ID
+        sessionManager = SessionManager(requireContext())
+
+        if (!sessionManager.isLoggedIn()) {
+            Log.e("AddItemsFragment", "User not logged in!")
+            navigateToLogin()
+            return
+        }
+
+        currentUserId = sessionManager.getUserId() ?: run {
+            Log.e("AddItemsFragment", "No user ID found!")
+            navigateToLogin()
+            return
+        }
+
+        Log.d("AddItemsFragment", "Current User ID: $currentUserId")
 
         viewModel = androidx.lifecycle.ViewModelProvider(requireActivity()).get(ListViewModel::class.java)
 
@@ -59,7 +77,7 @@ class AddItemsFragment : BaseFragment(R.layout.fragment_add_items) {
         val baseUrl = getString(R.string.base_url)
         apiService = ApiService(baseUrl)
         Log.d("AddItemsFragment", "Base URL: $baseUrl")
-        Log.d("AddItemsFragment", "Using fixed user ID: $FIXED_USER_ID")
+        Log.d("AddItemsFragment", "Using user ID: $currentUserId")
 
         // Find Views
         val etProductName = view.findViewById<AutoCompleteTextView>(R.id.etProductName)
@@ -168,7 +186,7 @@ class AddItemsFragment : BaseFragment(R.layout.fragment_add_items) {
             }
         }
 
-        // Save List Button - Using fixed user ID
+        // Save List Button - Using dynamic user ID
         btnSaveList.setOnClickListener {
             if (currentCartList.isEmpty()) {
                 Toast.makeText(requireContext(), "Your list is empty!", Toast.LENGTH_SHORT).show()
@@ -180,13 +198,13 @@ class AddItemsFragment : BaseFragment(R.layout.fragment_add_items) {
         }
     }
 
-    // Function to save list to backend - using fixed user ID
+    // Function to save list to backend - using dynamic user ID
     private suspend fun saveListToBackend(listName: String, items: List<CartItem>): Boolean {
         return try {
             Log.d("SAVE", "=== Starting save process ===")
             Log.d("SAVE", "List name: $listName")
             Log.d("SAVE", "Number of items: ${items.size}")
-            Log.d("SAVE", "Using fixed user ID: $FIXED_USER_ID")
+            Log.d("SAVE", "Using user ID: $currentUserId")
 
             // Create JSON for items
             val itemsArray = JSONArray()
@@ -194,6 +212,7 @@ class AddItemsFragment : BaseFragment(R.layout.fragment_add_items) {
                 val itemObj = JSONObject().apply {
                     put("name", "${item.name} at ${item.store}")
                     put("price", item.price)
+                    put("isChecked", false)
                 }
                 itemsArray.put(itemObj)
                 Log.d("SAVE", "  Item ${index + 1}: ${item.name} at ${item.store} - $${item.price}")
@@ -206,10 +225,10 @@ class AddItemsFragment : BaseFragment(R.layout.fragment_add_items) {
             }
 
             Log.d("SAVE", "Request body: $requestBody")
-            Log.d("SAVE", "Sending POST to: /users/$FIXED_USER_ID/shoplists")
+            Log.d("SAVE", "Sending POST to: /users/$currentUserId/shoplists")
 
             // Make API call to create shop list
-            val response = apiService.createShopList(FIXED_USER_ID, requestBody)
+            val response = apiService.createShopList(currentUserId, requestBody)
 
             Log.d("SAVE", "Create shop list response - Success: ${response.success}, Code: ${response.statusCode}")
             Log.d("SAVE", "Response body: ${response.body}")
@@ -256,7 +275,7 @@ class AddItemsFragment : BaseFragment(R.layout.fragment_add_items) {
                     saveButton.text = "Saving..."
 
                     // Save to backend in background
-                    GlobalScope.launch(Dispatchers.IO) {
+                    CoroutineScope(Dispatchers.IO).launch {
                         val success = saveListToBackend(listName, currentCartList)
 
                         withContext(Dispatchers.Main) {
@@ -311,12 +330,22 @@ class AddItemsFragment : BaseFragment(R.layout.fragment_add_items) {
 
         val formattedDate = SimpleDateFormat("MMM d, yyyy", Locale.getDefault()).format(Date())
 
+        val backendId = "local_${System.currentTimeMillis()}"
+        val localId = backendId.hashCode().toLong()
+
         val newListEntry = SavedList(
+            id = localId,
             name = name,
             date = formattedDate,
             items = savedItems
         )
 
         viewModel.addList(newListEntry)
+    }
+
+    private fun navigateToLogin() {
+        parentFragmentManager.beginTransaction()
+            .replace(R.id.fragment_container, LogInFragment())
+            .commit()
     }
 }

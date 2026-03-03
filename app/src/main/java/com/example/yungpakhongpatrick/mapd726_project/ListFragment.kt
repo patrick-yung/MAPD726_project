@@ -20,7 +20,8 @@ import java.util.Locale
 class ListFragment : BaseFragment(R.layout.fragment_list) {
     private lateinit var listViewModel: ListViewModel
     private lateinit var apiService: ApiService
-    private val FIXED_USER_ID = "69a73ea3f2f9ecd01c7bcbf2" // Your user ID
+    private lateinit var sessionManager: SessionManager
+    private var currentUserId: String = ""
     private val TAG = "ListFragment"
 
     // Views
@@ -34,6 +35,23 @@ class ListFragment : BaseFragment(R.layout.fragment_list) {
 
         Log.d(TAG, "=== ListFragment onViewCreated ===")
 
+        // Initialize SessionManager and get user ID
+        sessionManager = SessionManager(requireContext())
+
+        if (!sessionManager.isLoggedIn()) {
+            Log.e(TAG, "User not logged in!")
+            navigateToLogin()
+            return
+        }
+
+        currentUserId = sessionManager.getUserId() ?: run {
+            Log.e(TAG, "No user ID found!")
+            navigateToLogin()
+            return
+        }
+
+        Log.d(TAG, "Current User ID: $currentUserId")
+
         // Initialize views
         initViews(view)
 
@@ -44,7 +62,6 @@ class ListFragment : BaseFragment(R.layout.fragment_list) {
         val baseUrl = getString(R.string.base_url)
         apiService = ApiService(baseUrl)
         Log.d(TAG, "ApiService initialized with baseUrl: $baseUrl")
-        Log.d(TAG, "Fixed User ID: $FIXED_USER_ID")
 
         // Set up back button
         btnBackArrow.setOnClickListener {
@@ -91,12 +108,12 @@ class ListFragment : BaseFragment(R.layout.fragment_list) {
     }
 
     private fun fetchListsFromBackend() {
-        Log.d(TAG, "=== fetchListsFromBackend() called ===")
+        Log.d(TAG, "=== fetchListsFromBackend() called for user: $currentUserId ===")
 
         CoroutineScope(Dispatchers.IO).launch {
             try {
                 Log.d(TAG, "Making API call to getShopLists()")
-                val response = apiService.getShopLists(FIXED_USER_ID)
+                val response = apiService.getShopLists(currentUserId)
 
                 Log.d(TAG, "API Response - Success: ${response.success}, Code: ${response.statusCode}")
                 Log.d(TAG, "Response body: ${response.body}")
@@ -113,6 +130,12 @@ class ListFragment : BaseFragment(R.layout.fragment_list) {
                     } else {
                         Log.e(TAG, "Failed to fetch lists: ${response.errorMessage}")
                         Toast.makeText(requireContext(), "Failed to load from cloud: ${response.statusCode}", Toast.LENGTH_SHORT).show()
+
+                        // Handle unauthorized - session might have expired
+                        if (response.statusCode == 401 || response.statusCode == 403) {
+                            sessionManager.clearSession()
+                            navigateToLogin()
+                        }
                     }
                 }
             } catch (e: Exception) {
@@ -250,6 +273,12 @@ class ListFragment : BaseFragment(R.layout.fragment_list) {
         } catch (e: Exception) {
             Log.e(TAG, "Error opening list details", e)
         }
+    }
+
+    private fun navigateToLogin() {
+        parentFragmentManager.beginTransaction()
+            .replace(R.id.fragment_container, LogInFragment())
+            .commit()
     }
 
     override fun onDestroyView() {
