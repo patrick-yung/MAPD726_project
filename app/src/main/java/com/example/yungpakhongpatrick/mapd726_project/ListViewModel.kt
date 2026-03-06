@@ -12,6 +12,10 @@ class ListViewModel : ViewModel() {
 
     private val TAG = "ListViewModel"
 
+    // Stores the current list after filtering
+    private val _filteredLists = MutableLiveData<List<SavedList>>(emptyList())
+    val filteredLists: LiveData<List<SavedList>> = _filteredLists
+
     // Add a new list
     fun addList(savedList: SavedList) {
         val currentList = _allShoppingLists.value?.toMutableList() ?: mutableListOf()
@@ -29,6 +33,7 @@ class ListViewModel : ViewModel() {
         }
 
         _allShoppingLists.value = currentList
+        _filteredLists.value = currentList
     }
 
     // NEW: Update an existing list
@@ -76,6 +81,19 @@ class ListViewModel : ViewModel() {
         currentList.removeAll { it.id == listId }
         _allShoppingLists.value = currentList
         Log.d(TAG, "Removed list: $listId")
+    }
+
+    // Professional way to filter data in the ViewModel
+    fun filterByMonth(month: String) {
+        val all = _allShoppingLists.value ?: return
+
+        if (month == "All Months") {
+            _filteredLists.value = all
+        } else {
+            // Only keep lists where the date string contains the month name
+            _filteredLists.value = all.filter { it.date.contains(month) }
+        }
+        Log.d(TAG, "Filtered lists for month: $month")
     }
 
     // Clear all lists

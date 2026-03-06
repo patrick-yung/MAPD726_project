@@ -3,10 +3,14 @@ package com.example.yungpakhongpatrick.mapd726_project
 import android.os.Bundle
 import android.util.Log
 import android.view.View
+import android.widget.AdapterView
+import android.widget.ArrayAdapter
 import android.widget.ImageView
+import android.widget.Spinner
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.widget.PopupMenu
+import androidx.core.content.ContentProviderCompat.requireContext
 import androidx.lifecycle.ViewModelProvider
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
@@ -75,6 +79,7 @@ class ListFragment : BaseFragment(R.layout.fragment_list) {
         val popup = PopupMenu(requireContext(), view)
         popup.menu.add("Newest First")
         popup.menu.add("Oldest First")
+        popup.menu.add("Month Wise")
 
         popup.setOnMenuItemClickListener { item ->
             when (item.title) {
@@ -86,10 +91,39 @@ class ListFragment : BaseFragment(R.layout.fragment_list) {
                     isNewestFirst = false
                     listViewModel.allShoppingLists.value?.let { sortAndDisplayLists(it) }
                 }
+                "Month Wise" -> {
+                    // When clicked, show the months to choose from
+                    listViewModel.allShoppingLists.value?.let { showMonthSelectionDialog(it) }
+                }
             }
             true
         }
         popup.show()
+    }
+
+    private fun showMonthSelectionDialog(allLists: List<SavedList>) {
+        val options = mutableListOf("All Months")
+        allLists.forEach { list ->
+            val monthName = list.date.split(" ").firstOrNull()
+            if (monthName != null && !options.contains(monthName)) {
+                options.add(monthName)
+            }
+        }
+
+
+        androidx.appcompat.app.AlertDialog.Builder(requireContext())
+            .setTitle("Select Month")
+            .setItems(options.toTypedArray()) { _, which ->
+                val selected = options[which]
+                if (selected == "All Months") {
+                    sortAndDisplayLists(allLists)
+                } else {
+                    val filtered = allLists.filter { it.date.contains(selected) }
+                    sortAndDisplayLists(filtered)
+                }
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
     }
 
     private fun sortAndDisplayLists(lists: List<SavedList>) {
@@ -113,11 +147,11 @@ class ListFragment : BaseFragment(R.layout.fragment_list) {
             }
         }
         rvShoppingList.adapter = ListAdapter(
-            shoppingLists = sortedList, // FIXED: Changed 'lists' to 'shoppingLists'
+            shoppingLists = sortedList,
             onDeleteClick = { selectedList ->
                 showDeleteConfirmation(selectedList)
             },
-            onListClicked = { selectedList -> // FIXED: Changed 'onItemClick' to 'onListClicked'
+            onListClicked = { selectedList ->
                 openListDetails(selectedList)
             }
         )
@@ -158,11 +192,14 @@ class ListFragment : BaseFragment(R.layout.fragment_list) {
                     val itemObj = itemsArray.getJSONObject(j)
                     val itemName = itemObj.getString("name")
                     val itemPrice = itemObj.getDouble("price")
-                    val isChecked = if (itemObj.has("isChecked")) itemObj.getBoolean("isChecked") else false
+                    val isChecked =
+                        if (itemObj.has("isChecked")) itemObj.getBoolean("isChecked") else false
 
                     // Simple logic to extract store name if " at " exists
-                    val store = if (itemName.contains(" at ")) itemName.substringAfter(" at ") else "Unknown"
-                    val name = if (itemName.contains(" at ")) itemName.substringBefore(" at ") else itemName
+                    val store =
+                        if (itemName.contains(" at ")) itemName.substringAfter(" at ") else "Unknown"
+                    val name =
+                        if (itemName.contains(" at ")) itemName.substringBefore(" at ") else itemName
 
                     savedItems.add(SavedItem(name, itemPrice, store, isChecked))
                 }
@@ -212,6 +249,7 @@ class ListFragment : BaseFragment(R.layout.fragment_list) {
             .replace(R.id.fragment_container, LogInFragment())
             .commit()
     }
+
     private fun showDeleteConfirmation(list: SavedList) {
         androidx.appcompat.app.AlertDialog.Builder(requireContext())
             .setTitle("Delete List")
@@ -232,16 +270,59 @@ class ListFragment : BaseFragment(R.layout.fragment_list) {
 
                 withContext(Dispatchers.Main) {
                     if (response.success) {
-                        Toast.makeText(requireContext(), "List deleted permanently", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(
+                            requireContext(),
+                            "List deleted permanently",
+                            Toast.LENGTH_SHORT
+                        ).show()
                         // Remove from screen instantly
                         listViewModel.removeList(list.id)
                     } else {
-                        Toast.makeText(requireContext(), "Failed to delete from server", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(
+                            requireContext(),
+                            "Failed to delete from server",
+                            Toast.LENGTH_SHORT
+                        ).show()
                     }
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Error deleting list", e)
             }
+        }
+    }
+
+    private fun setupMonthFilter(allLists: List<SavedList>, spinner: Spinner) {
+        // Automatically extract ONLY the months you actually have lists for
+        val options = mutableListOf("All Months")
+
+        allLists.forEach { list ->
+            // This takes "Mar 4, 2026" and pulls out just "Mar"
+            val monthName = list.date.split(" ").firstOrNull()
+            if (monthName != null && !options.contains(monthName)) {
+                options.add(monthName)
+            }
+        }
+
+        // Setup the Spinner Adapter
+        val adapter = ArrayAdapter(requireContext(), android.R.layout.simple_spinner_item, options)
+        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+        spinner.adapter = adapter
+
+        // Handle the filtering
+        spinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
+                val selected = options[position]
+
+                if (selected == "All Months") {
+                    sortAndDisplayLists(allLists) // Show everything
+                } else {
+                    // Only show lists that match the selected month
+                    val filtered = allLists.filter { it.date.contains(selected) }
+                    sortAndDisplayLists(filtered)
+                }
+            }
+
+            override fun onNothingSelected(parent: AdapterView<*>?) {}
         }
     }
 }

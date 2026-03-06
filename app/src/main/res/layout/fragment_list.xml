@@ -50,6 +50,7 @@
         app:layout_constraintTop_toTopOf="@+id/headerBackground"
         app:layout_constraintBottom_toBottomOf="@+id/headerBackground" />
 
+
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/rvShoppingList"
         android:layout_width="match_parent"
