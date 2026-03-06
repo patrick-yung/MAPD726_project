@@ -9,6 +9,7 @@ data class SavedItem(
 
 data class SavedList(
     val id: Long = System.currentTimeMillis(),
+    val backendId: String? = null,
     val name: String,
     val date: String,
     val items: List<SavedItem>

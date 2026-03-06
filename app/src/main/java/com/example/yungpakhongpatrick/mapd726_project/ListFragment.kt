@@ -47,7 +47,7 @@ class ListFragment : BaseFragment(R.layout.fragment_list) {
         rvShoppingList = view.findViewById(R.id.rvShoppingList)
         btnBackArrow = view.findViewById(R.id.btnBackArrow)
         tvListTitle = view.findViewById(R.id.tvListTitle)
-        btnSort = view.findViewById(R.id.btnSort) // Find the sort button
+        btnSort = view.findViewById(R.id.btnSort)
 
         // Setup ViewModel & API
         listViewModel = ViewModelProvider(requireActivity())[ListViewModel::class.java]
@@ -65,10 +65,8 @@ class ListFragment : BaseFragment(R.layout.fragment_list) {
 
         // Observer
         listViewModel.allShoppingLists.observe(viewLifecycleOwner) { updatedLists ->
-            // Apply the current sort order whenever data changes
             sortAndDisplayLists(updatedLists)
         }
-
         fetchListsFromBackend()
     }
 
@@ -82,7 +80,6 @@ class ListFragment : BaseFragment(R.layout.fragment_list) {
             when (item.title) {
                 "Newest First" -> {
                     isNewestFirst = true
-                    // Re-sort current data
                     listViewModel.allShoppingLists.value?.let { sortAndDisplayLists(it) }
                 }
                 "Oldest First" -> {
@@ -100,17 +97,30 @@ class ListFragment : BaseFragment(R.layout.fragment_list) {
 
         val sortedList = if (isNewestFirst) {
             lists.sortedByDescending { list ->
-                try { dateFormat.parse(list.date) } catch (e: Exception) { Date(0) }
+                try {
+                    dateFormat.parse(list.date)
+                } catch (e: Exception) {
+                    Date(0)
+                }
             }
         } else {
             lists.sortedBy { list ->
-                try { dateFormat.parse(list.date) } catch (e: Exception) { Date(0) }
+                try {
+                    dateFormat.parse(list.date)
+                } catch (e: Exception) {
+                    Date(0)
+                }
             }
         }
-
-        rvShoppingList.adapter = ListAdapter(sortedList) { selectedList ->
-            openListDetails(selectedList)
-        }
+        rvShoppingList.adapter = ListAdapter(
+            shoppingLists = sortedList, // FIXED: Changed 'lists' to 'shoppingLists'
+            onDeleteClick = { selectedList ->
+                showDeleteConfirmation(selectedList)
+            },
+            onListClicked = { selectedList -> // FIXED: Changed 'onItemClick' to 'onListClicked'
+                openListDetails(selectedList)
+            }
+        )
     }
     // ---------------------
 
@@ -164,7 +174,7 @@ class ListFragment : BaseFragment(R.layout.fragment_list) {
                     SimpleDateFormat("MMM d, yyyy", Locale.getDefault()).format(Date())
                 }
 
-                val savedList = SavedList(localId, topic, formattedDate, savedItems)
+                val savedList = SavedList(localId, backendListId, topic, formattedDate, savedItems)
 
                 // Update ViewModel
                 val existingLists = listViewModel.allShoppingLists.value ?: emptyList()
@@ -175,6 +185,7 @@ class ListFragment : BaseFragment(R.layout.fragment_list) {
         } catch (e: Exception) {
             Log.e(TAG, "Error parsing lists", e)
         }
+
     }
 
     private fun formatDateFromBackend(dateString: String): String {
@@ -200,5 +211,37 @@ class ListFragment : BaseFragment(R.layout.fragment_list) {
         parentFragmentManager.beginTransaction()
             .replace(R.id.fragment_container, LogInFragment())
             .commit()
+    }
+    private fun showDeleteConfirmation(list: SavedList) {
+        androidx.appcompat.app.AlertDialog.Builder(requireContext())
+            .setTitle("Delete List")
+            .setMessage("Are you sure you want to delete '${list.name}'? This cannot be undone.")
+            .setPositiveButton("Delete") { _, _ ->
+                performDelete(list)
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun performDelete(list: SavedList) {
+        Toast.makeText(requireContext(), "Deleting...", Toast.LENGTH_SHORT).show()
+
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                val response = apiService.deleteShopList(currentUserId, list.backendId!!)
+
+                withContext(Dispatchers.Main) {
+                    if (response.success) {
+                        Toast.makeText(requireContext(), "List deleted permanently", Toast.LENGTH_SHORT).show()
+                        // Remove from screen instantly
+                        listViewModel.removeList(list.id)
+                    } else {
+                        Toast.makeText(requireContext(), "Failed to delete from server", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error deleting list", e)
+            }
+        }
     }
 }
