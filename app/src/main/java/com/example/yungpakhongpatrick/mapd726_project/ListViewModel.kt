@@ -16,6 +16,9 @@ class ListViewModel : ViewModel() {
     private val _filteredLists = MutableLiveData<List<SavedList>>(emptyList())
     val filteredLists: LiveData<List<SavedList>> = _filteredLists
 
+    // Holds the user's unsaved items if they navigate away
+    val draftCartList = mutableListOf<CartItem>()
+
     // Add a new list
     fun addList(savedList: SavedList) {
         val currentList = _allShoppingLists.value?.toMutableList() ?: mutableListOf()
