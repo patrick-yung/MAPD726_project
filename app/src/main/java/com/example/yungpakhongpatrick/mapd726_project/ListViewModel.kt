@@ -16,8 +16,27 @@ class ListViewModel : ViewModel() {
     private val _filteredLists = MutableLiveData<List<SavedList>>(emptyList())
     val filteredLists: LiveData<List<SavedList>> = _filteredLists
 
-    // Holds the user's unsaved items if they navigate away
     val draftCartList = mutableListOf<CartItem>()
+
+    val categorizedData = mapOf(
+        "Poultry" to mapOf(
+            "Milk (4L)" to listOf(5.49, 5.29, 5.59),
+            "Eggs (12pk)" to listOf(3.99, 3.50, 4.10)
+        ),
+        "Bakery" to mapOf(
+            "Bread" to listOf(2.99, 2.79, 3.29),
+            "Bagels (6pk)" to listOf(3.49, 3.99, 3.29)
+        ),
+        "Produce" to mapOf(
+            "Bananas" to listOf(0.79, 0.69, 0.89),
+            "Apples (1lb)" to listOf(2.49, 2.99, 2.29)
+        ),
+        "Pantry" to mapOf(
+            "Rice (8kg)" to listOf(18.99, 17.99, 19.49),
+            "Flour (2kg)" to listOf(4.49, 4.99, 4.29),
+            "Sugar (1kg)" to listOf(2.99, 2.79, 3.19)
+        )
+    )
 
     // Add a new list
     fun addList(savedList: SavedList) {
@@ -86,7 +105,6 @@ class ListViewModel : ViewModel() {
         Log.d(TAG, "Removed list: $listId")
     }
 
-    // Professional way to filter data in the ViewModel
     fun filterByMonth(month: String) {
         val all = _allShoppingLists.value ?: return
 

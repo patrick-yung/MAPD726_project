@@ -79,12 +79,16 @@
                 android:src="@android:drawable/ic_menu_search"
                 app:tint="@color/smart_cart_green" />
 
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
+            <EditText
+                android:id="@+id/etSearchHome"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
                 android:layout_marginStart="12dp"
-                android:text="@string/searchText"
-                android:textColor="#888888"
+                android:background="@android:color/transparent"
+                android:hint="@string/searchText"
+                android:imeOptions="actionSearch"
+                android:inputType="text"
+                android:textColor="#333333"
                 android:textSize="16sp" />
         </LinearLayout>
     </androidx.cardview.widget.CardView>

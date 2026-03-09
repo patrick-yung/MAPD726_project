@@ -31,26 +31,6 @@ class AddItemsFragment : BaseFragment(R.layout.fragment_add_items) {
     private var selectedStoreName: String? = null
     private var selectedPrice: Double = 0.0
 
-    // Product Data
-    private val categorizedData = mapOf(
-        "Poultry" to mapOf(
-            "Milk (4L)" to listOf(5.49, 5.29, 5.59),
-            "Eggs (12pk)" to listOf(3.99, 3.50, 4.10)
-        ),
-        "Bakery" to mapOf(
-            "Bread" to listOf(2.99, 2.79, 3.29),
-            "Bagels (6pk)" to listOf(3.49, 3.99, 3.29)
-        ),
-        "Produce" to mapOf(
-            "Bananas" to listOf(0.79, 0.69, 0.89),
-            "Apples (1lb)" to listOf(2.49, 2.99, 2.29)
-        ),
-        "Pantry" to mapOf(
-            "Rice (8kg)" to listOf(18.99, 17.99, 19.49),
-            "Flour (2kg)" to listOf(4.49, 4.99, 4.29),
-            "Sugar (1kg)" to listOf(2.99, 2.79, 3.19)
-        )
-    )
     private lateinit var viewModel: ListViewModel
     private lateinit var apiService: ApiService
     private lateinit var sessionManager: SessionManager
@@ -128,7 +108,7 @@ class AddItemsFragment : BaseFragment(R.layout.fragment_add_items) {
         val etItemType = view.findViewById<AutoCompleteTextView>(R.id.etItemType)
 
         // 1. Setup Item Type (Category) Dropdown
-        val categories = categorizedData.keys.toList()
+        val categories = viewModel.categorizedData.keys.toList()
         val typeAdapter = ArrayAdapter(requireContext(), android.R.layout.simple_dropdown_item_1line, categories)
         etItemType.setAdapter(typeAdapter)
 
@@ -137,7 +117,7 @@ class AddItemsFragment : BaseFragment(R.layout.fragment_add_items) {
         // 2. When Category is picked -> Fill the Product Dropdown
         etItemType.setOnItemClickListener { _, _, position, _ ->
             val selectedCategory = categories[position]
-            val productsInCategory = categorizedData[selectedCategory]?.keys?.toList() ?: emptyList()
+            val productsInCategory = viewModel.categorizedData[selectedCategory]?.keys?.toList() ?: emptyList()
 
             val productAdapter = ArrayAdapter(requireContext(), android.R.layout.simple_dropdown_item_1line, productsInCategory)
             etProductName.setAdapter(productAdapter)
@@ -158,7 +138,7 @@ class AddItemsFragment : BaseFragment(R.layout.fragment_add_items) {
             val selectedCategory = etItemType.text.toString()
             val selectedProduct = etProductName.text.toString()
 
-            val prices = categorizedData[selectedCategory]?.get(selectedProduct)
+            val prices = viewModel.categorizedData[selectedCategory]?.get(selectedProduct)
             if (prices != null) {
                 tvPriceWalmart.text = "$${prices[0]}"
                 tvPriceCostco.text = "$${prices[1]}"
@@ -439,19 +419,16 @@ class AddItemsFragment : BaseFragment(R.layout.fragment_add_items) {
     }
     private fun handleExitAttempt() {
         if (viewModel.draftCartList.isEmpty()) {
-            // If the cart is empty, just let them leave normally
             parentFragmentManager.popBackStack()
         } else {
-            // If they have items, show the warning popup!
             android.app.AlertDialog.Builder(requireContext())
                 .setTitle("Unsaved Items!")
                 .setMessage("You have items in your list that haven't been saved. Are you sure you want to leave without saving?")
                 .setPositiveButton("Leave Anyway") { _, _ ->
-                    // Clear the draft list and let them leave
                     viewModel.draftCartList.clear()
                     parentFragmentManager.popBackStack()
                 }
-                .setNegativeButton("Cancel", null) // Do nothing, close popup
+                .setNegativeButton("Cancel", null)
                 .show()
         }
     }

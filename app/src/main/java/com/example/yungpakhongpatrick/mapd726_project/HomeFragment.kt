@@ -1,6 +1,6 @@
 package com.example.yungpakhongpatrick.mapd726_project
 
-import ComparisonFragment
+import com.example.yungpakhongpatrick.mapd726_project.ComparisonFragment
 import android.content.ContentValues.TAG
 import android.content.Intent
 import android.os.Bundle
@@ -10,6 +10,7 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
+import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.lifecycle.ViewModelProvider
@@ -46,6 +47,28 @@ class HomeFragment : Fragment() {
         val userName = sessionManager.getUserName() ?: "Iffat"
 
         tvWelcome.text = "Welcome back, $userName"
+
+        val etSearchHome = view.findViewById<EditText>(R.id.etSearchHome)
+
+        etSearchHome.setOnEditorActionListener { _, actionId, _ ->
+            if (actionId == android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH) {
+                val query = etSearchHome.text.toString().trim()
+                if (query.isNotEmpty()) {
+                    val fragment = ComparisonFragment().apply {
+                        arguments = Bundle().apply {
+                            putString("PRODUCT_QUERY", query)
+                        }
+                    }
+                    parentFragmentManager.beginTransaction()
+                        .replace(R.id.fragment_container, fragment)
+                        .addToBackStack(null)
+                        .commit()
+                }
+                true
+            } else {
+                false
+            }
+        }
 
         // 1. Find the container created in XML
         val llRecentListsContainer = view.findViewById<LinearLayout>(R.id.llRecentListsContainer)
