@@ -13,6 +13,30 @@
         android:padding="16dp"
         android:background="?attr/selectableItemBackground">
 
+        <ImageView
+            android:id="@+id/btnDelete"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:src="@drawable/outline_delete_24"
+            app:tint="#D32F2F"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:padding="4dp"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintBottom_toBottomOf="parent" />
+        <TextView
+            android:id="@+id/tvListPrice"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="$52.45"
+            android:textColor="#2E7D32"
+            android:textSize="17sp"
+            android:textStyle="bold"
+            android:layout_marginEnd="12dp"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toStartOf="@+id/btnDelete"
+            app:layout_constraintTop_toTopOf="parent" />
+
         <TextView
             android:id="@+id/tvListName"
             android:layout_width="0dp"
@@ -21,18 +45,21 @@
             android:textColor="#000000"
             android:textSize="17sp"
             android:textStyle="bold"
-            app:layout_constraintEnd_toStartOf="@+id/tvListPrice"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:layout_marginEnd="8dp"
             app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toTopOf="parent" />
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintEnd_toStartOf="@+id/tvListPrice" />
 
         <TextView
             android:id="@+id/tvListDate"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="2dp"
+            android:layout_marginTop="4dp"
             android:text="Feb 14, 2026"
             android:textColor="#8E8E93"
-            android:textSize="15sp"
+            android:textSize="14sp"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toBottomOf="@+id/tvListName" />
 
@@ -43,28 +70,17 @@
             android:layout_marginStart="8dp"
             android:text="5 items"
             android:textColor="#8E8E93"
-            android:textSize="15sp"
+            android:textSize="14sp"
             app:layout_constraintBottom_toBottomOf="@+id/tvListDate"
             app:layout_constraintStart_toEndOf="@+id/tvListDate"
             app:layout_constraintTop_toTopOf="@+id/tvListDate" />
 
-        <TextView
-            android:id="@+id/tvListPrice"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="$52.45"
-            android:textColor="#000000"
-            android:textSize="17sp"
-            app:layout_constraintBottom_toBottomOf="parent"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintTop_toTopOf="parent" />
-
         <View
             android:layout_width="0dp"
             android:layout_height="0.5dp"
-            android:background="#C6C6C8"
+            android:background="#E0E0E0"
             android:layout_marginTop="16dp"
-            app:layout_constraintStart_toStartOf="@+id/tvListName"
+            app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintTop_toBottomOf="@id/tvListDate" />
 

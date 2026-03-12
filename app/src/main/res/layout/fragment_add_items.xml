@@ -5,7 +5,7 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    tools:context="AddItemsFragment"
+    tools:context=".AddItemsFragment"
     android:background="@color/light_background">
 
     <View
@@ -38,6 +38,22 @@
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="@+id/headerBackground" />
+
+    <TextView
+        android:id="@+id/btnSaveListHeader"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Save"
+        android:textColor="@color/white"
+        android:textSize="18sp"
+        android:textStyle="bold"
+        android:padding="16dp"
+        android:background="?attr/selectableItemBackgroundBorderless"
+        android:clickable="true"
+        android:focusable="true"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toTopOf="@+id/headerBackground"
+        app:layout_constraintBottom_toBottomOf="@+id/headerBackground" />
 
     <ScrollView
         android:id="@+id/svCurrentList"
@@ -72,40 +88,48 @@
         android:layout_height="wrap_content"
         android:background="@color/white"
         android:elevation="16dp"
-        android:paddingTop="20dp"
-        android:paddingBottom="24dp"
+        android:padding="20dp"
         app:layout_constraintBottom_toBottomOf="parent">
 
-        <androidx.cardview.widget.CardView
-            android:id="@+id/cardProduct"
+        <com.google.android.material.textfield.TextInputLayout
+            android:id="@+id/tilCategory"
             android:layout_width="match_parent"
-            android:layout_height="50dp"
-            android:layout_marginHorizontal="24dp"
-            app:cardBackgroundColor="#F5F5F5"
-            app:cardCornerRadius="8dp"
-            app:cardElevation="0dp"
+            android:layout_height="wrap_content"
+            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox.ExposedDropdownMenu"
+            android:hint="Category"
             app:layout_constraintTop_toTopOf="parent">
+
+            <AutoCompleteTextView
+                android:id="@+id/etItemType"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:inputType="none" />
+        </com.google.android.material.textfield.TextInputLayout>
+
+        <com.google.android.material.textfield.TextInputLayout
+            android:id="@+id/tilProduct"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox.ExposedDropdownMenu"
+            android:hint="Product"
+            app:layout_constraintTop_toBottomOf="@id/tilCategory">
 
             <AutoCompleteTextView
                 android:id="@+id/etProductName"
                 android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:background="@android:color/transparent"
-                android:hint="@string/searchProductText"
-                android:paddingHorizontal="16dp"
-                android:completionThreshold="1"
-                android:inputType="textCapWords" />
-        </androidx.cardview.widget.CardView>
+                android:layout_height="wrap_content"
+                android:inputType="none" />
+        </com.google.android.material.textfield.TextInputLayout>
 
         <LinearLayout
-            android:id="@+id/storeButtonsLayout"
+            android:id="@+id/storeCardsLayout"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginHorizontal="24dp"
             android:layout_marginTop="16dp"
             android:orientation="horizontal"
             android:weightSum="3"
-            app:layout_constraintTop_toBottomOf="@id/cardProduct">
+            app:layout_constraintTop_toBottomOf="@id/tilProduct">
 
             <LinearLayout
                 android:id="@+id/containerWalmart"
@@ -114,28 +138,13 @@
                 android:layout_weight="1"
                 android:orientation="vertical"
                 android:gravity="center"
+                android:layout_marginEnd="6dp"
+                android:padding="8dp"
+                android:background="@color/light_background"
                 android:clickable="true"
-                android:focusable="true"
-                android:padding="4dp"
-                android:layout_marginEnd="4dp">
-
-                <TextView
-                    android:id="@+id/tvPriceWalmart"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="--"
-                    android:textStyle="bold"
-                    android:textColor="#333"/>
-
-                <Button
-                    android:id="@+id/btnWalmart"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:text="@string/walmart"
-                    android:clickable="false"
-                    android:backgroundTint="#004FB6"
-                    android:textSize="14sp"
-                    android:padding="0dp"/>
+                android:focusable="true">
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Walmart" android:textSize="12sp" android:textColor="@color/walmart_blue" android:textStyle="bold"/>
+                <TextView android:id="@+id/tvPriceWalmart" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="--" android:textSize="16sp" android:textStyle="bold" android:textColor="@color/dark_text"/>
             </LinearLayout>
 
             <LinearLayout
@@ -145,28 +154,13 @@
                 android:layout_weight="1"
                 android:orientation="vertical"
                 android:gravity="center"
+                android:layout_marginHorizontal="6dp"
+                android:padding="8dp"
+                android:background="@color/light_background"
                 android:clickable="true"
-                android:focusable="true"
-                android:padding="4dp"
-                android:layout_marginHorizontal="4dp">
-
-                <TextView
-                    android:id="@+id/tvPriceCostco"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="--"
-                    android:textStyle="bold"
-                    android:textColor="#333"/>
-
-                <Button
-                    android:id="@+id/btnCostco"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:text="@string/costco"
-                    android:clickable="false"
-                    android:backgroundTint="#E31837"
-                    android:textSize="14sp"
-                    android:padding="0dp"/>
+                android:focusable="true">
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Costco" android:textSize="12sp" android:textColor="@color/costco_red" android:textStyle="bold"/>
+                <TextView android:id="@+id/tvPriceCostco" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="--" android:textSize="16sp" android:textStyle="bold" android:textColor="@color/dark_text"/>
             </LinearLayout>
 
             <LinearLayout
@@ -176,57 +170,50 @@
                 android:layout_weight="1"
                 android:orientation="vertical"
                 android:gravity="center"
+                android:layout_marginStart="6dp"
+                android:padding="8dp"
+                android:background="@color/light_background"
                 android:clickable="true"
-                android:focusable="true"
-                android:padding="4dp"
-                android:layout_marginStart="4dp">
-
-                <TextView
-                    android:id="@+id/tvPriceSuperstore"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="--"
-                    android:textStyle="bold"
-                    android:textColor="#333"/>
-
-                <Button
-                    android:id="@+id/btnSuperstore"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:text="@string/superstore"
-                    android:clickable="false"
-                    android:backgroundTint="#2E9E47"
-                    android:textSize="14sp"
-                    android:padding="0dp"/>
+                android:focusable="true">
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Superstore" android:textSize="12sp" android:textColor="@color/superstore_green" android:textStyle="bold"/>
+                <TextView android:id="@+id/tvPriceSuperstore" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="--" android:textSize="16sp" android:textStyle="bold" android:textColor="@color/dark_text"/>
             </LinearLayout>
         </LinearLayout>
+
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginHorizontal="24dp"
-            android:layout_marginTop="20dp"
+            android:layout_marginTop="16dp"
             android:orientation="horizontal"
-            app:layout_constraintTop_toBottomOf="@+id/storeButtonsLayout">
+            app:layout_constraintTop_toBottomOf="@id/storeCardsLayout">
+
+            <com.google.android.material.textfield.TextInputLayout
+                android:layout_width="100dp"
+                android:layout_height="match_parent"
+                android:layout_marginEnd="12dp"
+                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox.ExposedDropdownMenu"
+                android:hint="Qty">
+
+                <AutoCompleteTextView
+                    android:id="@+id/etQuantity"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:inputType="none"
+                    android:text="1"
+                    android:gravity="center" />
+            </com.google.android.material.textfield.TextInputLayout>
 
             <Button
                 android:id="@+id/btnAddItem"
                 android:layout_width="0dp"
-                android:layout_height="50dp"
+                android:layout_height="56dp"
                 android:layout_weight="1"
-                android:text="@string/addItemBtn"
-                android:backgroundTint="#555555"
-                android:layout_marginEnd="8dp"
-                app:cornerRadius="12dp" />
-
-            <Button
-                android:id="@+id/btnSaveList"
-                android:layout_width="0dp"
-                android:layout_height="50dp"
-                android:layout_weight="1"
-                android:text="@string/saveListBtn"
-                android:backgroundTint="@color/smart_cart_green"
-                android:layout_marginStart="8dp"
-                app:cornerRadius="12dp" />
+                android:text="Add to List"
+                android:textColor="@color/white"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                android:backgroundTint="@color/smart_cart_orange"
+                app:cornerRadius="8dp" />
         </LinearLayout>
     </androidx.constraintlayout.widget.ConstraintLayout>
 </androidx.constraintlayout.widget.ConstraintLayout>
