@@ -24,7 +24,7 @@ import java.util.Locale
 import androidx.core.content.ContextCompat
 
 // Simple data class
-data class CartItem(val name: String, val price: Double, val store: String, val type: String, val quantity: Int)
+data class CartItem(val name: String, val price: Double, val store: String, val type: String, var quantity: Int)
 class AddItemsFragment : BaseFragment(R.layout.fragment_add_items) {
 
     // Variables to track which store is selected
@@ -192,21 +192,7 @@ class AddItemsFragment : BaseFragment(R.layout.fragment_add_items) {
 //            currentCartList.add(newItem)
             tvEmptyHint.visibility = View.GONE
 
-            // Calculate Total: Price x Quantity
-            val totalItemPrice = newItem.price * quantity
-
-            // Format for UI
-            val itemText = "${viewModel.draftCartList.size}. ${newItem.name} (${newItem.type}) x$quantity - $${String.format(Locale.getDefault(), "%.2f", totalItemPrice)} at ${newItem.store}"
-
-            // Add to Screen
-            val itemView = LayoutInflater.from(requireContext())
-                .inflate(R.layout.item_cart_simple, llCartItemsContainer, false)
-
-            val tvName = itemView.findViewById<TextView>(R.id.item_name)
-            tvName.text = itemText
-            itemView.findViewById<TextView>(R.id.item_details).visibility = View.GONE
-
-            llCartItemsContainer.addView(itemView, 0)
+            refreshCartUI(llCartItemsContainer, tvEmptyHint, btnSaveList)
 
             //Turns orange when they add an item
             val btnSaveHeader = view.findViewById<TextView>(R.id.btnSaveListHeader)
@@ -259,6 +245,9 @@ class AddItemsFragment : BaseFragment(R.layout.fragment_add_items) {
                 llCartItemsContainer.addView(itemView)
             }
         }
+        // Put this at the very end of onViewCreated
+        val btnSaveHeader = view.findViewById<TextView>(R.id.btnSaveListHeader)
+        refreshCartUI(llCartItemsContainer, tvEmptyHint, btnSaveHeader)
     }
 
     // Function to save list to backend - using dynamic user ID
@@ -431,5 +420,72 @@ class AddItemsFragment : BaseFragment(R.layout.fragment_add_items) {
                 .setNegativeButton("Cancel", null)
                 .show()
         }
+    }
+    private fun refreshCartUI(
+        llCartItemsContainer: android.widget.LinearLayout,
+        tvEmptyHint: android.widget.TextView,
+        btnSaveHeader: android.widget.TextView
+    ) {
+        llCartItemsContainer.removeAllViews()
+
+        if (viewModel.draftCartList.isEmpty()) {
+            tvEmptyHint.visibility = View.VISIBLE
+            btnSaveHeader.setTextColor(androidx.core.content.ContextCompat.getColor(requireContext(), R.color.white))
+            btnSaveHeader.text = "Save"
+            return
+        }
+
+        tvEmptyHint.visibility = View.GONE
+        btnSaveHeader.setTextColor(androidx.core.content.ContextCompat.getColor(requireContext(), R.color.smart_cart_orange))
+        btnSaveHeader.text = "Save (${viewModel.draftCartList.size})"
+
+        viewModel.draftCartList.forEachIndexed { index, item ->
+            val totalItemPrice = item.price * item.quantity
+            val itemText = "${index + 1}. ${item.name} (${item.type}) x${item.quantity} - $${String.format(java.util.Locale.getDefault(), "%.2f", totalItemPrice)} at ${item.store}"
+
+            val itemView = android.view.LayoutInflater.from(requireContext()).inflate(R.layout.item_cart_simple, llCartItemsContainer, false)
+            val tvName = itemView.findViewById<android.widget.TextView>(R.id.item_name)
+            tvName.text = itemText
+            itemView.findViewById<android.widget.TextView>(R.id.item_details).visibility = View.GONE
+
+            itemView.setOnClickListener {
+                showEditQuantityDialog(item, llCartItemsContainer, tvEmptyHint, btnSaveHeader)
+            }
+
+            llCartItemsContainer.addView(itemView)
+        }
+    }
+
+
+    private fun showEditQuantityDialog(
+        item: CartItem,
+        llCartItemsContainer: android.widget.LinearLayout,
+        tvEmptyHint: android.widget.TextView,
+        btnSaveHeader: android.widget.TextView
+    ) {
+        // 1. Create the list of numbers
+        val quantities = arrayOf("1", "2", "3", "4", "5", "6", "7", "8", "9", "10")
+
+        android.app.AlertDialog.Builder(requireContext())
+            // 2. Put the item name in the Title so it's clear
+            .setTitle("Select Quantity: ${item.name}")
+
+            // 3. IMPORTANT: Delete the .setMessage(...) line entirely!
+
+            .setItems(quantities) { _, which ->
+                val newQuantity = quantities[which].toInt()
+                item.quantity = newQuantity // Updates the data in the "Brain"
+
+                Toast.makeText(requireContext(), "Quantity updated!", Toast.LENGTH_SHORT).show()
+
+                // 4. Redraw the UI with the new math
+                refreshCartUI(llCartItemsContainer, tvEmptyHint, btnSaveHeader)
+            }
+            .setNeutralButton("Delete Item") { _, _ ->
+                viewModel.draftCartList.remove(item)
+                refreshCartUI(llCartItemsContainer, tvEmptyHint, btnSaveHeader)
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
     }
 }
