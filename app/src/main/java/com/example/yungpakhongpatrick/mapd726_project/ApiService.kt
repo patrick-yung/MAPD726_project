@@ -74,9 +74,10 @@ class ApiService(private val baseUrl: String) {
         return makeRequest("/users", "GET")
     }
 
-    fun createUser(username: String): ApiResponse {
+    fun createUser(username: String, password: String): ApiResponse {
         val jsonBody = JSONObject().apply {
             put("username", username)
+            put("password", password)
         }
         return makeRequest("/users", "POST", jsonBody)
     }
@@ -85,9 +86,29 @@ class ApiService(private val baseUrl: String) {
         return makeRequest("/users/$userId", "GET")
     }
 
-    fun updateUser(userId: String, username: String): ApiResponse {
+    // NEW: Get user by username (useful for login)
+    fun getUserByUsername(username: String): ApiResponse {
+        return makeRequest("/users?username=$username", "GET")
+    }
+
+    // NEW: Authenticate user with username and password
+    fun authenticateUser(username: String, password: String): ApiResponse {
         val jsonBody = JSONObject().apply {
             put("username", username)
+            put("password", password)
+        }
+        return makeRequest("/users/authenticate", "POST", jsonBody)
+    }
+
+    // NEW: Get user's password by user ID (if needed for specific use cases)
+    fun getUserPassword(userId: String): ApiResponse {
+        return makeRequest("/users/$userId/password", "GET")
+    }
+
+    fun updateUser(userId: String, username: String, password: String? = null): ApiResponse {
+        val jsonBody = JSONObject().apply {
+            put("username", username)
+            password?.let { put("password", it) }
         }
         return makeRequest("/users/$userId", "PUT", jsonBody)
     }
@@ -113,5 +134,10 @@ class ApiService(private val baseUrl: String) {
     // Optional: Delete a shop list
     fun deleteShopList(userId: String, listId: String): ApiResponse {
         return makeRequest("/users/$userId/shoplists/$listId", "DELETE")
+    }
+
+    // NEW: Get specific shop list by ID
+    fun getShopListById(userId: String, listId: String): ApiResponse {
+        return makeRequest("/users/$userId/shoplists/$listId", "GET")
     }
 }

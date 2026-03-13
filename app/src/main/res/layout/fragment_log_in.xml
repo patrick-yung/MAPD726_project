@@ -36,6 +36,16 @@
         android:background="@android:drawable/editbox_background"
         android:layout_marginBottom="16dp"/>
 
+    <EditText
+        android:id="@+id/etLoginPassword"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="Enter Password"
+        android:inputType="textPassword"
+        android:padding="16dp"
+        android:background="@android:drawable/editbox_background"
+        android:layout_marginBottom="16dp"/>
+
     <Button
         android:id="@+id/btnLogin"
         android:layout_width="match_parent"
