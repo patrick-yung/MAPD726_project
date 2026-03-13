@@ -57,16 +57,43 @@ class LogInFragment : BaseFragment(R.layout.fragment_log_in) {
 
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                // Step 1: Check if user exists by getting all users and filtering
+                // Step 1: Try to authenticate first
+                withContext(Dispatchers.Main) { btnLogin.text = "Authenticating..." }
+                val authResponse = apiService.authenticateUser(username, password)
+
+                if (authResponse.success) {
+                    // Authentication successful!
+                    withContext(Dispatchers.Main) {
+                        try {
+                            val responseObj = JSONObject(authResponse.body)
+                            val userObj = responseObj.getJSONObject("user")
+                            val userId = userObj.getString("_id")
+
+                            // Save user session
+                            sessionManager.saveUserSession(userId, username)
+                            saveUserIdLocally(userId)
+
+                            Log.d(TAG, "User authenticated: $username with ID: $userId")
+                            Toast.makeText(requireContext(), "Welcome back, $username!", Toast.LENGTH_SHORT).show()
+                            navigateToHome()
+                        } catch (e: Exception) {
+                            Log.e(TAG, "Error parsing auth response", e)
+                            Toast.makeText(requireContext(), "Error parsing response", Toast.LENGTH_SHORT).show()
+                            btnLogin.isEnabled = true
+                            btnLogin.text = "Login"
+                        }
+                    }
+                    return@launch
+                }
+
+                // Step 2: If authentication failed, check if user exists
                 withContext(Dispatchers.Main) { btnLogin.text = "Checking user..." }
                 val getResponse = apiService.getUsers()
 
-                var userId: String? = null
                 var userExists = false
-                var storedPassword: String? = null
+                var userId: String? = null
 
                 if (getResponse.success) {
-                    // Parse the response to find if user exists and get their password
                     try {
                         val usersArray = JSONArray(getResponse.body)
                         for (i in 0 until usersArray.length()) {
@@ -76,7 +103,6 @@ class LogInFragment : BaseFragment(R.layout.fragment_log_in) {
                             if (existingUsername.equals(username, ignoreCase = true)) {
                                 userExists = true
                                 userId = userObj.optString("_id")
-                                storedPassword = userObj.optString("password")
                                 break
                             }
                         }
@@ -85,30 +111,12 @@ class LogInFragment : BaseFragment(R.layout.fragment_log_in) {
                     }
                 }
 
-                // Step 2: Handle based on whether user exists
                 if (userExists) {
-                    // User exists - verify password
-                    withContext(Dispatchers.Main) { btnLogin.text = "Verifying password..." }
-
-                    if (storedPassword == password) {
-                        // Password is correct - login successful
-                        withContext(Dispatchers.Main) {
-                            Log.d(TAG, "User logged in: $username with ID: $userId")
-
-                            // Save user session
-                            sessionManager.saveUserSession(userId!!, username)
-                            saveUserIdLocally(userId!!)
-
-                            Toast.makeText(requireContext(), "Welcome back, $username!", Toast.LENGTH_SHORT).show()
-                            navigateToHome()
-                        }
-                    } else {
-                        // Password is incorrect
-                        withContext(Dispatchers.Main) {
-                            Toast.makeText(requireContext(), "Incorrect password. Please try again.", Toast.LENGTH_LONG).show()
-                            btnLogin.isEnabled = true
-                            btnLogin.text = "Login"
-                        }
+                    // User exists but password was wrong
+                    withContext(Dispatchers.Main) {
+                        Toast.makeText(requireContext(), "Incorrect password. Please try again.", Toast.LENGTH_LONG).show()
+                        btnLogin.isEnabled = true
+                        btnLogin.text = "Login"
                     }
                 } else {
                     // User doesn't exist - create new account
@@ -116,7 +124,6 @@ class LogInFragment : BaseFragment(R.layout.fragment_log_in) {
                     val createResponse = apiService.createUser(username, password)
 
                     if (createResponse.success) {
-                        // Parse the new user object to get the ID
                         try {
                             val newUserObj = JSONObject(createResponse.body)
                             userId = newUserObj.optString("_id")
@@ -145,15 +152,8 @@ class LogInFragment : BaseFragment(R.layout.fragment_log_in) {
                             }
                         }
                     } else {
-                        // Failed to create user
                         withContext(Dispatchers.Main) {
-                            val errorMsg = try {
-                                val errorObj = JSONObject(createResponse.body)
-                                errorObj.optString("error", "Unknown error")
-                            } catch (e: Exception) {
-                                "Failed to create account"
-                            }
-                            Toast.makeText(requireContext(), "Error: $errorMsg", Toast.LENGTH_LONG).show()
+                            Toast.makeText(requireContext(), "Failed to create account: ${createResponse.statusCode}", Toast.LENGTH_LONG).show()
                             btnLogin.isEnabled = true
                             btnLogin.text = "Login"
                         }
