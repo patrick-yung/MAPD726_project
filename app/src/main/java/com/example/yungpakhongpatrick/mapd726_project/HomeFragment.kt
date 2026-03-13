@@ -109,6 +109,7 @@ class HomeFragment : Fragment() {
                 val totalPrice = savedList.items.sumOf { it.price }
                 tvListPrice.text = "$${String.format(java.util.Locale.getDefault(), "%.2f", totalPrice)}"
 
+
                 // Add the fully built card to the screen
                 llRecentListsContainer.addView(cardView)
             }
@@ -122,6 +123,15 @@ class HomeFragment : Fragment() {
                 .commit()
         }
         fetchListsFromBackend()
+
+        val btnOpenMap = view.findViewById<Button>(R.id.btnOpenMap)
+
+        btnOpenMap.setOnClickListener {
+            parentFragmentManager.beginTransaction()
+                .replace(R.id.fragment_container, StoresMapFragment())
+                .addToBackStack(null)
+                .commit()
+        }
     }
 
     private fun fetchListsFromBackend() {

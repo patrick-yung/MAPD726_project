@@ -1,25 +1,19 @@
 package com.example.yungpakhongpatrick.mapd726_project
 
-import DealsFragment
-
-import android.content.Intent
 import android.os.Bundle
-import android.widget.Button
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.fragment.app.Fragment
-import com.example.yungpakhongpatrick.mapd726_project.R.*
 import com.google.android.material.bottomnavigation.BottomNavigationView
-import kotlin.jvm.java
 
 class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        setContentView(layout.activity_main)
-        ViewCompat.setOnApplyWindowInsetsListener(findViewById(id.main)) { v, insets ->
+        setContentView(R.layout.activity_main)
+        ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main)) { v, insets ->
             val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
             v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom)
             insets
@@ -36,20 +30,20 @@ class MainActivity : AppCompatActivity() {
         }
         // 3. The "Switching" Logic
         bottomNav.setOnItemSelectedListener { item ->
-            var selectedFragment: Fragment? = null
-
-            when (item.itemId) {
+            val selectedFragment: Fragment? = when (item.itemId) {
                 // If user clicks "Home" icon -> Load HomeFragment
-                R.id.nav_home -> selectedFragment = HomeFragment()
+                R.id.nav_home -> HomeFragment()
 
                 // If user clicks "Deals" icon -> Load DealsFragment
-                  R.id.nav_deals -> selectedFragment = DealsFragment()
+                R.id.nav_deals -> DealsFragment()
 
                 // If user clicks "List" icon -> Load ListFragment
-                 R.id.nav_list -> selectedFragment = ListFragment()
+                R.id.nav_list -> ListFragment()
 
                 // (Optional) If you have an "Add" button
-                R.id.nav_add -> selectedFragment = AddItemsFragment()
+                R.id.nav_add -> AddItemsFragment()
+                
+                else -> null
             }
             // 4. Perform the actual switch
             if (selectedFragment != null) {
@@ -67,5 +61,4 @@ class MainActivity : AppCompatActivity() {
             .addToBackStack(null)
             .commit()
     }
-    }
-
+}
