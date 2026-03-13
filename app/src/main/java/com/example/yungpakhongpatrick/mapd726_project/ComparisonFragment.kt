@@ -114,12 +114,14 @@ class ComparisonFragment : BaseFragment(R.layout.fragment_comparison) {
                         type = foundCategoryName!!,
                         quantity = 1
                     )
-
-                    // Add it directly to the shared list
                     viewModel.draftCartList.add(newItem)
 
                     Toast.makeText(requireContext(), "Added $foundProductName from $bestStoreName!", Toast.LENGTH_SHORT).show()
-                    parentFragmentManager.popBackStack()
+                   // parentFragmentManager.popBackStack()
+                    parentFragmentManager.beginTransaction()
+                        .replace(R.id.fragment_container, AddItemsFragment())
+                        .addToBackStack(null)
+                        .commit()
                 }
             }
 
