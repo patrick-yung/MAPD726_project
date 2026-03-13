@@ -216,36 +216,9 @@ class AddItemsFragment : BaseFragment(R.layout.fragment_add_items) {
                 Toast.makeText(requireContext(), "Your list is empty!", Toast.LENGTH_SHORT).show()
                 return@setOnClickListener
             }
-
             // Show dialog to get list name
             showSaveListDialog(llCartItemsContainer, tvEmptyHint)
         }
-        if (viewModel.draftCartList.isNotEmpty()) {
-            tvEmptyHint.visibility = View.GONE
-
-            // Keep the save button orange if they have unsaved items
-            val btnSaveHeader = view.findViewById<TextView>(R.id.btnSaveListHeader)
-            btnSaveHeader.setTextColor(ContextCompat.getColor(requireContext(), R.color.smart_cart_orange))
-            btnSaveHeader.text = "Save (${viewModel.draftCartList.size})"
-
-            // Clear container to prevent duplicates
-            llCartItemsContainer.removeAllViews()
-
-            // Re-draw each item onto the screen
-            viewModel.draftCartList.forEachIndexed { index, item ->
-                val totalItemPrice = item.price * item.quantity
-                val itemText = "${index + 1}. ${item.name} (${item.type}) x${item.quantity} - $${String.format(Locale.getDefault(), "%.2f", totalItemPrice)} at ${item.store}"
-
-                val itemView = LayoutInflater.from(requireContext()).inflate(R.layout.item_cart_simple, llCartItemsContainer, false)
-                val tvName = itemView.findViewById<TextView>(R.id.item_name)
-                tvName.text = itemText
-                itemView.findViewById<TextView>(R.id.item_details).visibility = View.GONE
-
-                // Add to the bottom so the numbers stay in order (1, 2, 3...)
-                llCartItemsContainer.addView(itemView)
-            }
-        }
-        // Put this at the very end of onViewCreated
         val btnSaveHeader = view.findViewById<TextView>(R.id.btnSaveListHeader)
         refreshCartUI(llCartItemsContainer, tvEmptyHint, btnSaveHeader)
     }
@@ -339,14 +312,13 @@ class AddItemsFragment : BaseFragment(R.layout.fragment_add_items) {
                                 Toast.makeText(requireContext(), "List '$listName' saved to cloud!", Toast.LENGTH_SHORT).show()
                                 alertDialog.dismiss()
 
-                                // Clear the current UI list after saving
+                                // 1. Clear the draft cart to prevent double-saves
                                 viewModel.draftCartList.clear()
-                                llCartItemsContainer.removeAllViews()
-                                tvEmptyHint.visibility = View.VISIBLE
 
-                                val btnSaveHeader = requireView().findViewById<TextView>(R.id.btnSaveListHeader)
-                                btnSaveHeader.setTextColor(ContextCompat.getColor(requireContext(), R.color.white))
-                                btnSaveHeader.text = "Save"
+                                // 2. Navigate away immediately!
+                                // (No need to manually reset colors or hints since we are leaving the screen)
+                                parentFragmentManager.popBackStack()
+
                             } else {
                                 Toast.makeText(requireContext(), "Failed to save to cloud. Please check Logcat for details.", Toast.LENGTH_LONG).show()
                                 saveButton.isEnabled = true
@@ -463,22 +435,15 @@ class AddItemsFragment : BaseFragment(R.layout.fragment_add_items) {
         tvEmptyHint: android.widget.TextView,
         btnSaveHeader: android.widget.TextView
     ) {
-        // 1. Create the list of numbers
         val quantities = arrayOf("1", "2", "3", "4", "5", "6", "7", "8", "9", "10")
-
         android.app.AlertDialog.Builder(requireContext())
-            // 2. Put the item name in the Title so it's clear
             .setTitle("Select Quantity: ${item.name}")
-
-            // 3. IMPORTANT: Delete the .setMessage(...) line entirely!
 
             .setItems(quantities) { _, which ->
                 val newQuantity = quantities[which].toInt()
                 item.quantity = newQuantity // Updates the data in the "Brain"
 
                 Toast.makeText(requireContext(), "Quantity updated!", Toast.LENGTH_SHORT).show()
-
-                // 4. Redraw the UI with the new math
                 refreshCartUI(llCartItemsContainer, tvEmptyHint, btnSaveHeader)
             }
             .setNeutralButton("Delete Item") { _, _ ->
