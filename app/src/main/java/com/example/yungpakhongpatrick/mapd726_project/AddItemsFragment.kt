@@ -338,8 +338,14 @@ class AddItemsFragment : BaseFragment(R.layout.fragment_add_items) {
                                 saveListToLocal(listName, viewModel.draftCartList)
                                 Toast.makeText(requireContext(), "List '$listName' saved to cloud!", Toast.LENGTH_SHORT).show()
                                 alertDialog.dismiss()
+
+                                // 1. Clear the draft cart to prevent double-saves
                                 viewModel.draftCartList.clear()
+
+                                // 2. Navigate away immediately!
+                                // (No need to manually reset colors or hints since we are leaving the screen)
                                 parentFragmentManager.popBackStack()
+
                             } else {
                                 Toast.makeText(requireContext(), "Failed to save to cloud. Check Logcat.", Toast.LENGTH_LONG).show()
                                 saveButton.isEnabled = true

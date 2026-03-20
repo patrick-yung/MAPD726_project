@@ -178,6 +178,7 @@ class ListFragment : BaseFragment(R.layout.fragment_list) {
 
     private fun parseAndAddLists(jsonResponse: String) {
         try {
+            listViewModel.clearAllLists()
             val jsonArray = JSONArray(jsonResponse)
             for (i in 0 until jsonArray.length()) {
                 val listObj = jsonArray.getJSONObject(i)
