@@ -140,4 +140,57 @@ class ApiService(private val baseUrl: String) {
     fun getShopListById(userId: String, listId: String): ApiResponse {
         return makeRequest("/users/$userId/shoplists/$listId", "GET")
     }
+
+    // Add these methods to your ApiService class in ApiService.kt
+
+    // Product API methods
+    fun getCategorizedProducts(): ApiResponse {
+        return makeRequest("/products/categorized", "GET")
+    }
+
+    fun getProducts(): ApiResponse {
+        return makeRequest("/products", "GET")
+    }
+
+    fun getProductsByCategory(category: String): ApiResponse {
+        return makeRequest("/products/category/$category", "GET")
+    }
+
+    fun searchProducts(query: String): ApiResponse {
+        return makeRequest("/products/search?q=$query", "GET")
+    }
+
+    fun createProduct(name: String, category: String, prices: Map<String, Double>): ApiResponse {
+        val jsonBody = JSONObject().apply {
+            put("name", name)
+            put("category", category)
+            val pricesObject = JSONObject().apply {
+                put("walmart", prices["walmart"] ?: 0.0)
+                put("costco", prices["costco"] ?: 0.0)
+                put("superstore", prices["superstore"] ?: 0.0)
+            }
+            put("prices", pricesObject)
+        }
+        return makeRequest("/products", "POST", jsonBody)
+    }
+
+    fun updateProduct(productId: String, name: String? = null, category: String? = null, prices: Map<String, Double>? = null): ApiResponse {
+        val jsonBody = JSONObject().apply {
+            name?.let { put("name", it) }
+            category?.let { put("category", it) }
+            prices?.let {
+                val pricesObject = JSONObject().apply {
+                    it["walmart"]?.let { put("walmart", it) }
+                    it["costco"]?.let { put("costco", it) }
+                    it["superstore"]?.let { put("superstore", it) }
+                }
+                put("prices", pricesObject)
+            }
+        }
+        return makeRequest("/products/$productId", "PUT", jsonBody)
+    }
+
+    fun deleteProduct(productId: String): ApiResponse {
+        return makeRequest("/products/$productId", "DELETE")
+    }
 }
