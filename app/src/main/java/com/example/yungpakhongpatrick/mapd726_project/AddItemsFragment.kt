@@ -25,6 +25,7 @@ import androidx.core.content.ContextCompat
 
 // Simple data class
 data class CartItem(val name: String, val price: Double, val store: String, val type: String, var quantity: Int)
+
 class AddItemsFragment : BaseFragment(R.layout.fragment_add_items) {
 
     // Variables to track which store is selected
@@ -35,6 +36,9 @@ class AddItemsFragment : BaseFragment(R.layout.fragment_add_items) {
     private lateinit var apiService: ApiService
     private lateinit var sessionManager: SessionManager
     private var currentUserId: String = ""
+
+    // Store categorized data locally
+    private var categorizedData: Map<String, Map<String, List<Double>>> = emptyMap()
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
@@ -107,48 +111,35 @@ class AddItemsFragment : BaseFragment(R.layout.fragment_add_items) {
         val btnSaveList = view.findViewById<TextView>(R.id.btnSaveListHeader)
         val etItemType = view.findViewById<AutoCompleteTextView>(R.id.etItemType)
 
-        // 1. Setup Item Type (Category) Dropdown
-        val categories = viewModel.categorizedData.keys.toList()
-        val typeAdapter = ArrayAdapter(requireContext(), android.R.layout.simple_dropdown_item_1line, categories)
-        etItemType.setAdapter(typeAdapter)
-
-        etItemType.setOnClickListener { etItemType.showDropDown() }
-
-        // 2. When Category is picked -> Fill the Product Dropdown
-        etItemType.setOnItemClickListener { _, _, position, _ ->
-            val selectedCategory = categories[position]
-            val productsInCategory = viewModel.categorizedData[selectedCategory]?.keys?.toList() ?: emptyList()
-
-            val productAdapter = ArrayAdapter(requireContext(), android.R.layout.simple_dropdown_item_1line, productsInCategory)
-            etProductName.setAdapter(productAdapter)
-
-            // Clear old selections
-            etProductName.text.clear()
-            tvPriceWalmart.text = "--"
-            tvPriceCostco.text = "--"
-            tvPriceSuperstore.text = "--"
-            resetStoreSelection(containerWalmart, containerCostco, containerSuperstore)
-            selectedStoreName = null
+        // Fetch categorized data if not loaded
+        if (viewModel.categorizedData.value == null) {
+            viewModel.fetchCategorizedData(apiService)
         }
 
-        etProductName.setOnClickListener { etProductName.showDropDown() }
-
-        // 3. When Product is picked -> Show the Prices
-        etProductName.setOnItemClickListener { _, _, _, _ ->
-            val selectedCategory = etItemType.text.toString()
-            val selectedProduct = etProductName.text.toString()
-
-            val prices = viewModel.categorizedData[selectedCategory]?.get(selectedProduct)
-            if (prices != null) {
-                tvPriceWalmart.text = "$${prices[0]}"
-                tvPriceCostco.text = "$${prices[1]}"
-                tvPriceSuperstore.text = "$${prices[2]}"
-                resetStoreSelection(containerWalmart, containerCostco, containerSuperstore)
-                selectedStoreName = null
+        // Observe categorized data
+        viewModel.categorizedData.observe(viewLifecycleOwner) { data ->
+            if (data != null && data.isNotEmpty()) {
+                categorizedData = data
+                setupCategoryDropdown(etItemType, etProductName, tvPriceWalmart, tvPriceCostco, tvPriceSuperstore,
+                    containerWalmart, containerCostco, containerSuperstore)
             }
         }
 
-        // Handle Store Clicks (Walmart)
+        // Observe loading state
+        viewModel.isLoadingProducts.observe(viewLifecycleOwner) { isLoading ->
+            if (isLoading) {
+                Toast.makeText(requireContext(), "Loading products...", Toast.LENGTH_SHORT).show()
+            }
+        }
+
+        // Observe errors
+        viewModel.productError.observe(viewLifecycleOwner) { error ->
+            error?.let {
+                Toast.makeText(requireContext(), "Error: $it", Toast.LENGTH_SHORT).show()
+            }
+        }
+
+        // Setup store click listeners
         containerWalmart.setOnClickListener {
             highlightStore(containerWalmart, containerCostco, containerSuperstore)
             selectedStoreName = "Walmart"
@@ -156,7 +147,6 @@ class AddItemsFragment : BaseFragment(R.layout.fragment_add_items) {
             if(priceText != "--") selectedPrice = priceText.toDouble()
         }
 
-        // Handle Store Clicks (Costco)
         containerCostco.setOnClickListener {
             highlightStore(containerCostco, containerWalmart, containerSuperstore)
             selectedStoreName = "Costco"
@@ -164,7 +154,6 @@ class AddItemsFragment : BaseFragment(R.layout.fragment_add_items) {
             if(priceText != "--") selectedPrice = priceText.toDouble()
         }
 
-        // Handle Store Clicks (Superstore)
         containerSuperstore.setOnClickListener {
             highlightStore(containerSuperstore, containerWalmart, containerCostco)
             selectedStoreName = "Superstore"
@@ -178,7 +167,6 @@ class AddItemsFragment : BaseFragment(R.layout.fragment_add_items) {
             val productName = etProductName.text.toString().trim()
             val quantityStr = etQuantity.text.toString().trim()
 
-            // Safely convert quantity to a number, default to 1
             val quantity = if (quantityStr.isNotEmpty()) quantityStr.toInt() else 1
 
             if (itemType.isEmpty() || productName.isEmpty() || selectedStoreName == null) {
@@ -186,15 +174,12 @@ class AddItemsFragment : BaseFragment(R.layout.fragment_add_items) {
                 return@setOnClickListener
             }
 
-            // Save the item
             val newItem = CartItem(productName, selectedPrice, selectedStoreName!!, itemType, quantity)
             viewModel.draftCartList.add(newItem)
-//            currentCartList.add(newItem)
             tvEmptyHint.visibility = View.GONE
 
             refreshCartUI(llCartItemsContainer, tvEmptyHint, btnSaveList)
 
-            //Turns orange when they add an item
             val btnSaveHeader = view.findViewById<TextView>(R.id.btnSaveListHeader)
             btnSaveHeader.setTextColor(ContextCompat.getColor(requireContext(), R.color.smart_cart_orange))
             btnSaveHeader.text = "Save (${viewModel.draftCartList.size})"
@@ -210,20 +195,81 @@ class AddItemsFragment : BaseFragment(R.layout.fragment_add_items) {
             resetStoreSelection(containerWalmart, containerCostco, containerSuperstore)
             selectedStoreName = null
         }
-        // Save List Button - Using dynamic user ID
+
+        // Save List Button
         btnSaveList.setOnClickListener {
             if (viewModel.draftCartList.isEmpty()) {
                 Toast.makeText(requireContext(), "Your list is empty!", Toast.LENGTH_SHORT).show()
                 return@setOnClickListener
             }
-            // Show dialog to get list name
             showSaveListDialog(llCartItemsContainer, tvEmptyHint)
         }
+
         val btnSaveHeader = view.findViewById<TextView>(R.id.btnSaveListHeader)
         refreshCartUI(llCartItemsContainer, tvEmptyHint, btnSaveHeader)
     }
 
-    // Function to save list to backend - using dynamic user ID
+    private fun setupCategoryDropdown(
+        etItemType: AutoCompleteTextView,
+        etProductName: AutoCompleteTextView,
+        tvPriceWalmart: TextView,
+        tvPriceCostco: TextView,
+        tvPriceSuperstore: TextView,
+        containerWalmart: LinearLayout,
+        containerCostco: LinearLayout,
+        containerSuperstore: LinearLayout
+    ) {
+        val categories = categorizedData.keys.toList()
+        val typeAdapter = ArrayAdapter(requireContext(), android.R.layout.simple_dropdown_item_1line, categories)
+        etItemType.setAdapter(typeAdapter)
+        etItemType.setOnClickListener { etItemType.showDropDown() }
+
+        // When Category is picked -> Fill the Product Dropdown
+        etItemType.setOnItemClickListener { _, _, position, _ ->
+            val selectedCategory = categories[position]
+            val productsInCategory = categorizedData[selectedCategory]?.keys?.toList() ?: emptyList()
+
+            val productAdapter = ArrayAdapter(requireContext(), android.R.layout.simple_dropdown_item_1line, productsInCategory)
+            etProductName.setAdapter(productAdapter)
+
+            etProductName.text.clear()
+            tvPriceWalmart.text = "--"
+            tvPriceCostco.text = "--"
+            tvPriceSuperstore.text = "--"
+            resetStoreSelection(containerWalmart, containerCostco, containerSuperstore)
+            selectedStoreName = null
+        }
+
+        etProductName.setOnClickListener { etProductName.showDropDown() }
+
+        // When Product is picked -> Show the Prices
+        etProductName.setOnItemClickListener { _, _, _, _ ->
+            val selectedCategory = etItemType.text.toString()
+            val selectedProduct = etProductName.text.toString()
+
+            val prices = categorizedData[selectedCategory]?.get(selectedProduct)
+            if (prices != null) {
+                tvPriceWalmart.text = "$${prices[0]}"
+                tvPriceCostco.text = "$${prices[1]}"
+                tvPriceSuperstore.text = "$${prices[2]}"
+                resetStoreSelection(containerWalmart, containerCostco, containerSuperstore)
+                selectedStoreName = null
+            }
+        }
+    }
+
+    private fun highlightStore(selected: View, other1: View, other2: View) {
+        selected.setBackgroundColor(ContextCompat.getColor(requireContext(), R.color.best_deal_bg))
+        other1.setBackgroundColor(ContextCompat.getColor(requireContext(), R.color.light_background))
+        other2.setBackgroundColor(ContextCompat.getColor(requireContext(), R.color.light_background))
+    }
+
+    private fun resetStoreSelection(v1: View, v2: View, v3: View) {
+        v1.setBackgroundColor(ContextCompat.getColor(requireContext(), R.color.light_background))
+        v2.setBackgroundColor(ContextCompat.getColor(requireContext(), R.color.light_background))
+        v3.setBackgroundColor(ContextCompat.getColor(requireContext(), R.color.light_background))
+    }
+
     private suspend fun saveListToBackend(listName: String, items: List<CartItem>): Boolean {
         return try {
             Log.d("SAVE", "=== Starting save process ===")
@@ -231,34 +277,23 @@ class AddItemsFragment : BaseFragment(R.layout.fragment_add_items) {
             Log.d("SAVE", "Number of items: ${items.size}")
             Log.d("SAVE", "Using user ID: $currentUserId")
 
-            // Create JSON for items
             val itemsArray = JSONArray()
-            items.forEachIndexed { index, item ->
+            items.forEach { item ->
                 val itemObj = JSONObject().apply {
-                    // Saves as: "Rice (8kg) (Pantry) x2 at Walmart"
                     put("name", "${item.name} (${item.type}) x${item.quantity} at ${item.store}")
-                    // Saves the total price for that row
                     put("price", item.price * item.quantity)
                     put("isChecked", false)
                 }
                 itemsArray.put(itemObj)
             }
 
-            // Create request body for shop list
             val requestBody = JSONObject().apply {
                 put("topic", listName)
                 put("items", itemsArray)
             }
 
-            Log.d("SAVE", "Request body: $requestBody")
             Log.d("SAVE", "Sending POST to: /users/$currentUserId/shoplists")
-
-            // Make API call to create shop list
             val response = apiService.createShopList(currentUserId, requestBody)
-
-            Log.d("SAVE", "Create shop list response - Success: ${response.success}, Code: ${response.statusCode}")
-            Log.d("SAVE", "Response body: ${response.body}")
-            Log.d("SAVE", "Error message: ${response.errorMessage}")
 
             if (response.success) {
                 Log.d("SAVE", "✓ List saved successfully!")
@@ -273,13 +308,10 @@ class AddItemsFragment : BaseFragment(R.layout.fragment_add_items) {
         }
     }
 
-    // Function to show the save list dialog
     private fun showSaveListDialog(llCartItemsContainer: LinearLayout, tvEmptyHint: TextView) {
-        // 1. Inflate the custom dialog layout
         val dialogView = LayoutInflater.from(requireContext()).inflate(R.layout.dialog_save_list, null)
         val etListName = dialogView.findViewById<EditText>(R.id.etListName)
 
-        // 2. Create the AlertDialog
         val alertDialog = android.app.AlertDialog.Builder(requireContext())
             .setView(dialogView)
             .setCancelable(true)
@@ -287,7 +319,6 @@ class AddItemsFragment : BaseFragment(R.layout.fragment_add_items) {
             .setNegativeButton("Cancel") { dialog, _ -> dialog.dismiss() }
             .create()
 
-        // 3. Handle the "Save" click with validation
         alertDialog.setOnShowListener {
             val saveButton = alertDialog.getButton(android.app.AlertDialog.BUTTON_POSITIVE)
             saveButton.setOnClickListener {
@@ -296,19 +327,15 @@ class AddItemsFragment : BaseFragment(R.layout.fragment_add_items) {
                 if (listName.isEmpty()) {
                     etListName.error = "Please enter a list name"
                 } else {
-                    // Disable button to prevent double clicks
                     saveButton.isEnabled = false
                     saveButton.text = "Saving..."
 
-                    // Save to backend in background
                     CoroutineScope(Dispatchers.IO).launch {
                         val success = saveListToBackend(listName, viewModel.draftCartList)
 
                         withContext(Dispatchers.Main) {
                             if (success) {
-                                // Also save locally via ViewModel
                                 saveListToLocal(listName, viewModel.draftCartList)
-
                                 Toast.makeText(requireContext(), "List '$listName' saved to cloud!", Toast.LENGTH_SHORT).show()
                                 alertDialog.dismiss()
 
@@ -320,7 +347,7 @@ class AddItemsFragment : BaseFragment(R.layout.fragment_add_items) {
                                 parentFragmentManager.popBackStack()
 
                             } else {
-                                Toast.makeText(requireContext(), "Failed to save to cloud. Please check Logcat for details.", Toast.LENGTH_LONG).show()
+                                Toast.makeText(requireContext(), "Failed to save to cloud. Check Logcat.", Toast.LENGTH_LONG).show()
                                 saveButton.isEnabled = true
                                 saveButton.text = "Save"
                             }
@@ -331,21 +358,6 @@ class AddItemsFragment : BaseFragment(R.layout.fragment_add_items) {
         }
 
         alertDialog.show()
-    }
-
-    // --- HELPER FUNCTIONS ---
-
-    private fun highlightStore(selected: View, other1: View, other2: View) {
-        selected.setBackgroundColor(ContextCompat.getColor(requireContext(), R.color.best_deal_bg))
-
-        other1.setBackgroundColor(ContextCompat.getColor(requireContext(), R.color.light_background))
-        other2.setBackgroundColor(ContextCompat.getColor(requireContext(), R.color.light_background))
-    }
-
-    private fun resetStoreSelection(v1: View, v2: View, v3: View) {
-        v1.setBackgroundColor(ContextCompat.getColor(requireContext(), R.color.light_background))
-        v2.setBackgroundColor(ContextCompat.getColor(requireContext(), R.color.light_background))
-        v3.setBackgroundColor(ContextCompat.getColor(requireContext(), R.color.light_background))
     }
 
     private fun saveListToLocal(name: String, items: List<CartItem>) {
@@ -378,6 +390,7 @@ class AddItemsFragment : BaseFragment(R.layout.fragment_add_items) {
             .replace(R.id.fragment_container, LogInFragment())
             .commit()
     }
+
     private fun handleExitAttempt() {
         if (viewModel.draftCartList.isEmpty()) {
             parentFragmentManager.popBackStack()
@@ -393,32 +406,33 @@ class AddItemsFragment : BaseFragment(R.layout.fragment_add_items) {
                 .show()
         }
     }
+
     private fun refreshCartUI(
-        llCartItemsContainer: android.widget.LinearLayout,
-        tvEmptyHint: android.widget.TextView,
-        btnSaveHeader: android.widget.TextView
+        llCartItemsContainer: LinearLayout,
+        tvEmptyHint: TextView,
+        btnSaveHeader: TextView
     ) {
         llCartItemsContainer.removeAllViews()
 
         if (viewModel.draftCartList.isEmpty()) {
             tvEmptyHint.visibility = View.VISIBLE
-            btnSaveHeader.setTextColor(androidx.core.content.ContextCompat.getColor(requireContext(), R.color.white))
+            btnSaveHeader.setTextColor(ContextCompat.getColor(requireContext(), R.color.white))
             btnSaveHeader.text = "Save"
             return
         }
 
         tvEmptyHint.visibility = View.GONE
-        btnSaveHeader.setTextColor(androidx.core.content.ContextCompat.getColor(requireContext(), R.color.smart_cart_orange))
+        btnSaveHeader.setTextColor(ContextCompat.getColor(requireContext(), R.color.smart_cart_orange))
         btnSaveHeader.text = "Save (${viewModel.draftCartList.size})"
 
         viewModel.draftCartList.forEachIndexed { index, item ->
             val totalItemPrice = item.price * item.quantity
-            val itemText = "${index + 1}. ${item.name} (${item.type}) x${item.quantity} - $${String.format(java.util.Locale.getDefault(), "%.2f", totalItemPrice)} at ${item.store}"
+            val itemText = "${index + 1}. ${item.name} (${item.type}) x${item.quantity} - $${String.format(Locale.getDefault(), "%.2f", totalItemPrice)} at ${item.store}"
 
-            val itemView = android.view.LayoutInflater.from(requireContext()).inflate(R.layout.item_cart_simple, llCartItemsContainer, false)
-            val tvName = itemView.findViewById<android.widget.TextView>(R.id.item_name)
+            val itemView = LayoutInflater.from(requireContext()).inflate(R.layout.item_cart_simple, llCartItemsContainer, false)
+            val tvName = itemView.findViewById<TextView>(R.id.item_name)
             tvName.text = itemText
-            itemView.findViewById<android.widget.TextView>(R.id.item_details).visibility = View.GONE
+            itemView.findViewById<TextView>(R.id.item_details).visibility = View.GONE
 
             itemView.setOnClickListener {
                 showEditQuantityDialog(item, llCartItemsContainer, tvEmptyHint, btnSaveHeader)
@@ -428,21 +442,18 @@ class AddItemsFragment : BaseFragment(R.layout.fragment_add_items) {
         }
     }
 
-
     private fun showEditQuantityDialog(
         item: CartItem,
-        llCartItemsContainer: android.widget.LinearLayout,
-        tvEmptyHint: android.widget.TextView,
-        btnSaveHeader: android.widget.TextView
+        llCartItemsContainer: LinearLayout,
+        tvEmptyHint: TextView,
+        btnSaveHeader: TextView
     ) {
         val quantities = arrayOf("1", "2", "3", "4", "5", "6", "7", "8", "9", "10")
         android.app.AlertDialog.Builder(requireContext())
             .setTitle("Select Quantity: ${item.name}")
-
             .setItems(quantities) { _, which ->
                 val newQuantity = quantities[which].toInt()
-                item.quantity = newQuantity // Updates the data in the "Brain"
-
+                item.quantity = newQuantity
                 Toast.makeText(requireContext(), "Quantity updated!", Toast.LENGTH_SHORT).show()
                 refreshCartUI(llCartItemsContainer, tvEmptyHint, btnSaveHeader)
             }

@@ -56,6 +56,8 @@ kotlin {
 
 dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
+    implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.6.2")
     implementation("com.google.android.gms:play-services-maps:19.2.0")
     implementation("com.google.android.gms:play-services-location:21.3.0")
 

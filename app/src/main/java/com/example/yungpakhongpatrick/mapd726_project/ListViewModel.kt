@@ -3,12 +3,26 @@ package com.example.yungpakhongpatrick.mapd726_project
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import android.util.Log
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import org.json.JSONObject
 
 class ListViewModel : ViewModel() {
 
     private val _allShoppingLists = MutableLiveData<List<SavedList>>(emptyList())
     val allShoppingLists: LiveData<List<SavedList>> = _allShoppingLists
+
+    private val _categorizedData = MutableLiveData<Map<String, Map<String, List<Double>>>>()
+    val categorizedData: LiveData<Map<String, Map<String, List<Double>>>> = _categorizedData
+
+    private val _isLoadingProducts = MutableLiveData<Boolean>()
+    val isLoadingProducts: LiveData<Boolean> = _isLoadingProducts
+
+    private val _productError = MutableLiveData<String?>()
+    val productError: LiveData<String?> = _productError
 
     private val TAG = "ListViewModel"
 
@@ -18,25 +32,96 @@ class ListViewModel : ViewModel() {
 
     val draftCartList = mutableListOf<CartItem>()
 
-    val categorizedData = mapOf(
-        "Poultry" to mapOf(
-            "Milk (4L)" to listOf(5.49, 5.29, 5.59),
-            "Eggs (12pk)" to listOf(3.99, 3.50, 4.10)
-        ),
-        "Bakery" to mapOf(
-            "Bread" to listOf(2.99, 2.79, 3.29),
-            "Bagels (6pk)" to listOf(3.49, 3.99, 3.29)
-        ),
-        "Produce" to mapOf(
-            "Bananas" to listOf(0.79, 0.69, 0.89),
-            "Apples (1lb)" to listOf(2.49, 2.99, 2.29)
-        ),
-        "Pantry" to mapOf(
-            "Rice (8kg)" to listOf(18.99, 17.99, 19.49),
-            "Flour (2kg)" to listOf(4.49, 4.99, 4.29),
-            "Sugar (1kg)" to listOf(2.99, 2.79, 3.19)
-        )
-    )
+    // Initialize with empty map - will be populated from backend
+    private var _categorizedDataMap: Map<String, Map<String, List<Double>>> = emptyMap()
+
+    // Function to fetch categorized data from backend
+    fun fetchCategorizedData(apiService: ApiService) {
+        viewModelScope.launch {
+            _isLoadingProducts.value = true
+            _productError.value = null
+
+            try {
+                val response = withContext(Dispatchers.IO) {
+                    apiService.getCategorizedProducts()
+                }
+
+                if (response.success && response.statusCode == 200) {
+                    val jsonObject = JSONObject(response.body)
+                    val result = mutableMapOf<String, MutableMap<String, List<Double>>>()
+
+                    jsonObject.keys().forEach { category ->
+                        val productsObject = jsonObject.getJSONObject(category)
+                        val products = mutableMapOf<String, List<Double>>()
+
+                        productsObject.keys().forEach { productName ->
+                            val pricesArray = productsObject.getJSONArray(productName)
+                            val prices = mutableListOf<Double>()
+                            for (i in 0 until pricesArray.length()) {
+                                prices.add(pricesArray.getDouble(i))
+                            }
+                            products[productName] = prices
+                        }
+                        result[category] = products
+                    }
+
+                    _categorizedDataMap = result
+                    _categorizedData.value = result
+                    Log.d(TAG, "Successfully loaded ${result.size} categories from backend")
+                } else {
+                    _productError.value = "Failed to load products: ${response.errorMessage ?: "Unknown error"}"
+                    Log.e(TAG, "Failed to fetch categorized data: ${response.errorMessage}")
+                }
+            } catch (e: Exception) {
+                _productError.value = "Error loading products: ${e.message}"
+                Log.e(TAG, "Error fetching categorized data", e)
+            } finally {
+                _isLoadingProducts.value = false
+            }
+        }
+    }
+
+    // Get categorized data synchronously (for use in fragments)
+    fun getCategorizedData(): Map<String, Map<String, List<Double>>> {
+        return _categorizedDataMap
+    }
+
+    // Search products by name (returns list of products with their categories)
+    fun searchProducts(apiService: ApiService, query: String, callback: (List<SearchResult>?) -> Unit) {
+        viewModelScope.launch {
+            try {
+                val response = withContext(Dispatchers.IO) {
+                    apiService.searchProducts(query)
+                }
+
+                if (response.success && response.statusCode == 200) {
+                    val jsonArray = org.json.JSONArray(response.body)
+                    val results = mutableListOf<SearchResult>()
+
+                    for (i in 0 until jsonArray.length()) {
+                        val productJson = jsonArray.getJSONObject(i)
+                        results.add(
+                            SearchResult(
+                                name = productJson.getString("name"),
+                                category = productJson.getString("category"),
+                                prices = listOf(
+                                    productJson.getJSONObject("prices").getDouble("walmart"),
+                                    productJson.getJSONObject("prices").getDouble("costco"),
+                                    productJson.getJSONObject("prices").getDouble("superstore")
+                                )
+                            )
+                        )
+                    }
+                    callback(results)
+                } else {
+                    callback(null)
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error searching products", e)
+                callback(null)
+            }
+        }
+    }
 
     // Add a new list
     fun addList(savedList: SavedList) {
@@ -58,7 +143,7 @@ class ListViewModel : ViewModel() {
         _filteredLists.value = currentList
     }
 
-    // NEW: Update an existing list
+    // Update an existing list
     fun updateList(savedList: SavedList) {
         val currentList = _allShoppingLists.value?.toMutableList() ?: return
 
@@ -128,3 +213,10 @@ class ListViewModel : ViewModel() {
         return _allShoppingLists.value?.firstOrNull { it.id == listId }
     }
 }
+
+// Data class for search results
+data class SearchResult(
+    val name: String,
+    val category: String,
+    val prices: List<Double>
+)
