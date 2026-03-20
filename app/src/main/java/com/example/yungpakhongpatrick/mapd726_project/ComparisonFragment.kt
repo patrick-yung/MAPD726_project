@@ -6,8 +6,6 @@ import android.widget.Button
 import android.widget.TextView
 import android.widget.Toast
 import androidx.lifecycle.ViewModelProvider
-import androidx.lifecycle.lifecycleScope
-import kotlinx.coroutines.launch
 
 class ComparisonFragment : BaseFragment(R.layout.fragment_comparison) {
 
@@ -157,7 +155,7 @@ class ComparisonFragment : BaseFragment(R.layout.fragment_comparison) {
         val btnAddBestDeal = view.findViewById<Button>(R.id.btnAddBestDeal)
         btnAddBestDeal?.setOnClickListener {
             if (foundProductName != null && foundCategoryName != null) {
-                // Create a CartItem using the same class from your AddItemsFragment
+                // Create a CartItem
                 val newItem = CartItem(
                     name = foundProductName!!,
                     price = bestPrice,
@@ -170,7 +168,12 @@ class ComparisonFragment : BaseFragment(R.layout.fragment_comparison) {
                 viewModel.draftCartList.add(newItem)
 
                 Toast.makeText(requireContext(), "Added $foundProductName from $bestStoreName!", Toast.LENGTH_SHORT).show()
-                parentFragmentManager.popBackStack()
+
+                // Navigate to AddItemsFragment to see the cart
+                parentFragmentManager.beginTransaction()
+                    .replace(R.id.fragment_container, AddItemsFragment())
+                    .addToBackStack(null)
+                    .commit()
             }
         }
     }
