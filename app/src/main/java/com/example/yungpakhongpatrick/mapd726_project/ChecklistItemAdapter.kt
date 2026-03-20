@@ -36,10 +36,12 @@ class ChecklistItemAdapter(
         holder.itemName.text = "${item.name} (${item.store})"
         holder.itemPrice.text = "$${String.format("%.2f", item.price)}"
 
+        // Remove listener temporarily to avoid triggering while setting state
         holder.checkbox.setOnCheckedChangeListener(null)
         holder.checkbox.isChecked = item.isChecked
         updateItemDecoration(holder.itemName, item.isChecked)
 
+        // Set listener after state is set
         holder.checkbox.setOnCheckedChangeListener { _, isChecked ->
             updateItemDecoration(holder.itemName, isChecked)
             onCheckedChanged(position, isChecked)
