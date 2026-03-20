@@ -26,6 +26,8 @@ class ListDetailsFragment : BaseFragment(R.layout.fragment_list_details) {
     private var fetchJob: Job? = null
     private var saveJob: Job? = null
     private lateinit var checklistAdapter: ChecklistItemAdapter
+    private var isUpdatingFromBackend = false
+    private var isDataReady = false  // Flag to track if backend ID is ready
 
     companion object {
         private const val TAG = "ListDetailsFragment"
@@ -47,7 +49,6 @@ class ListDetailsFragment : BaseFragment(R.layout.fragment_list_details) {
         Log.d(TAG, "onViewCreated - Fragment Started")
         Log.d(TAG, "=================================")
 
-        // Initialize SessionManager and get user ID
         sessionManager = SessionManager(requireContext())
 
         if (!sessionManager.isLoggedIn()) {
@@ -62,9 +63,6 @@ class ListDetailsFragment : BaseFragment(R.layout.fragment_list_details) {
             return
         }
 
-        Log.d(TAG, "Current User ID: $currentUserId")
-
-        // Get the list ID from arguments
         currentListId = arguments?.getLong(ARG_LIST_ID) ?: run {
             Log.e(TAG, "ERROR: No list ID provided in arguments!")
             return
@@ -72,49 +70,74 @@ class ListDetailsFragment : BaseFragment(R.layout.fragment_list_details) {
 
         Log.d(TAG, "Current List ID (local): $currentListId")
 
-        // Initialize ViewModel
         viewModel = ViewModelProvider(requireActivity())[ListViewModel::class.java]
-        Log.d(TAG, "ViewModel initialized")
 
-        // Initialize ApiService
         val baseUrl = getString(R.string.base_url)
         apiService = ApiService(baseUrl)
-        Log.d(TAG, "ApiService initialized with baseUrl: $baseUrl")
 
-        // Find views
         val tvHeaderTitle = view.findViewById<TextView>(R.id.tvHeaderTitle)
         val tvDate = view.findViewById<TextView>(R.id.tvListDate)
         val tvTotalAmount = view.findViewById<TextView>(R.id.tvListTotalAmount)
         val tvEmpty = view.findViewById<TextView>(R.id.tvEmptyItems)
         val rvItems = view.findViewById<RecyclerView>(R.id.rvListItems)
 
-        Log.d(TAG, "Views found")
-
-        // Setup adapter with save functionality
         checklistAdapter = ChecklistItemAdapter(emptyList()) { itemIndex, isChecked ->
+            if (isUpdatingFromBackend) {
+                Log.d(TAG, "Skipping update - currently updating from backend")
+                return@ChecklistItemAdapter
+            }
+
+            if (!isDataReady) {
+                Log.d(TAG, "Data not ready yet, cannot save")
+                Toast.makeText(requireContext(), "Please wait, loading list...", Toast.LENGTH_SHORT).show()
+                return@ChecklistItemAdapter
+            }
+
             Log.d(TAG, "Item checked: index=$itemIndex, isChecked=$isChecked")
 
-            // Update in ViewModel first (immediate UI feedback)
-            viewModel.updateItemChecked(currentListId, itemIndex, isChecked)
+            val currentList = viewModel.allShoppingLists.value?.firstOrNull { it.id == currentListId }
 
-            // Then save to backend
-            saveItemCheckedState(itemIndex, isChecked)
+            if (currentList != null && itemIndex < currentList.items.size) {
+                val item = currentList.items[itemIndex]
+
+                // Update local state immediately
+                viewModel.updateItemChecked(currentListId, itemIndex, isChecked)
+
+                // Save to backend
+                saveItemCheckedState(itemIndex, isChecked, item)
+            }
         }
 
         rvItems.layoutManager = LinearLayoutManager(requireContext())
         rvItems.adapter = checklistAdapter
-        Log.d(TAG, "RecyclerView setup complete")
 
         // Observe ViewModel for updates
         viewModel.allShoppingLists.observe(viewLifecycleOwner) { allLists ->
+            if (isUpdatingFromBackend) {
+                Log.d(TAG, "Skipping observer update - currently updating from backend")
+                return@observe
+            }
+
             Log.d(TAG, "========== ViewModel Update ==========")
 
             val selectedList = allLists.firstOrNull { it.id == currentListId }
 
             if (selectedList != null) {
                 Log.d(TAG, "✓ FOUND current list in ViewModel!")
+                Log.d(TAG, "List name: ${selectedList.name}")
+                Log.d(TAG, "Number of items: ${selectedList.items.size}")
 
-                // Update UI
+                // Check if we have the backend ID
+                if (selectedList.backendId != null && currentBackendListId == null) {
+                    currentBackendListId = selectedList.backendId
+                    isDataReady = true
+                    Log.d(TAG, "Backend ID set from ViewModel: $currentBackendListId")
+                }
+
+                selectedList.items.forEachIndexed { idx, item ->
+                    Log.d(TAG, "Item $idx: ${item.name}, isChecked=${item.isChecked}")
+                }
+
                 tvHeaderTitle.text = selectedList.name
                 tvDate.text = selectedList.date
                 tvTotalAmount.text = "$${String.format("%.2f", selectedList.totalPrice)}"
@@ -126,8 +149,7 @@ class ListDetailsFragment : BaseFragment(R.layout.fragment_list_details) {
             Log.d(TAG, "=======================================")
         }
 
-        // Fetch from backend
-        Log.d(TAG, "Initiating backend fetch...")
+        // Fetch from backend to get the backend ID
         fetchListFromBackend()
     }
 
@@ -144,16 +166,14 @@ class ListDetailsFragment : BaseFragment(R.layout.fragment_list_details) {
                 withContext(Dispatchers.Main) {
                     if (response.success) {
                         if (response.body.isNotEmpty() && response.body != "[]" && response.body != "null") {
-                            Log.d(TAG, "Response has content, parsing...")
+                            Log.d(TAG, "Response received, parsing...")
                             parseAndUpdateLists(response.body)
                         } else {
                             Log.w(TAG, "⚠ Response body is empty")
                         }
                     } else {
                         Log.e(TAG, "❌ API call failed: ${response.statusCode}")
-                        Toast.makeText(requireContext(), "Failed to fetch from cloud: ${response.statusCode}", Toast.LENGTH_SHORT).show()
-
-                        // Handle unauthorized
+                        Toast.makeText(requireContext(), "Failed to fetch: ${response.statusCode}", Toast.LENGTH_SHORT).show()
                         if (response.statusCode == 401 || response.statusCode == 403) {
                             sessionManager.clearSession()
                             navigateToLogin()
@@ -171,7 +191,10 @@ class ListDetailsFragment : BaseFragment(R.layout.fragment_list_details) {
 
     private fun parseAndUpdateLists(jsonResponse: String) {
         try {
+            isUpdatingFromBackend = true
+
             val jsonArray = JSONArray(jsonResponse)
+            Log.d(TAG, "Parsing ${jsonArray.length()} lists from backend")
 
             for (i in 0 until jsonArray.length()) {
                 val listObj = jsonArray.getJSONObject(i)
@@ -180,15 +203,19 @@ class ListDetailsFragment : BaseFragment(R.layout.fragment_list_details) {
                 val topic = listObj.getString("topic")
                 val localId = backendListId.hashCode().toLong()
 
-                // Store the backend ID for our current list
+                Log.d(TAG, "Processing list: $topic (backend ID: $backendListId, local ID: $localId)")
+
+                // If this is our current list, save the backend ID
                 if (localId == currentListId) {
                     currentBackendListId = backendListId
-                    Log.d(TAG, "Found current list! Backend ID: $backendListId")
+                    isDataReady = true
+                    Log.d(TAG, "✓ SET BACKEND ID: $backendListId")
                 }
 
-                // Parse items with checked state
                 val itemsArray = listObj.getJSONArray("items")
                 val savedItems = mutableListOf<SavedItem>()
+
+                Log.d(TAG, "  Found ${itemsArray.length()} items in this list")
 
                 for (j in 0 until itemsArray.length()) {
                     val itemObj = itemsArray.getJSONObject(j)
@@ -200,6 +227,8 @@ class ListDetailsFragment : BaseFragment(R.layout.fragment_list_details) {
                     } else {
                         false
                     }
+
+                    Log.d(TAG, "  Item $j: $itemName, price: $itemPrice, isChecked: $isChecked")
 
                     val store = if (itemName.contains(" at ")) {
                         itemName.substringAfter(" at ")
@@ -223,7 +252,6 @@ class ListDetailsFragment : BaseFragment(R.layout.fragment_list_details) {
                     )
                 }
 
-                // Parse the created date from backend
                 var formattedDate = SimpleDateFormat("MMM d, yyyy", Locale.getDefault()).format(Date())
                 if (listObj.has("createdDate")) {
                     try {
@@ -236,6 +264,7 @@ class ListDetailsFragment : BaseFragment(R.layout.fragment_list_details) {
 
                 val savedList = SavedList(
                     id = localId,
+                    backendId = backendListId,
                     name = topic,
                     date = formattedDate,
                     items = savedItems
@@ -249,23 +278,41 @@ class ListDetailsFragment : BaseFragment(R.layout.fragment_list_details) {
                     Log.d(TAG, "Adding new list to ViewModel: $topic")
                     viewModel.addList(savedList)
                 } else {
-                    Log.d(TAG, "List already in ViewMmodels, skipping")
+                    Log.d(TAG, "Updating existing list in ViewModel: $topic")
+                    viewModel.updateList(savedList)
                 }
             }
+
         } catch (e: Exception) {
             Log.e(TAG, "❌ Error parsing JSON", e)
+        } finally {
+            isUpdatingFromBackend = false
         }
     }
 
-    private fun saveItemCheckedState(itemIndex: Int, isChecked: Boolean) {
+    private fun saveItemCheckedState(itemIndex: Int, isChecked: Boolean, item: SavedItem) {
         Log.d(TAG, "========== saveItemCheckedState() ==========")
+        Log.d(TAG, "Item: ${item.name}, Index: $itemIndex, IsChecked: $isChecked")
+        Log.d(TAG, "Current Backend List ID: $currentBackendListId")
+        Log.d(TAG, "Is Data Ready: $isDataReady")
 
-        if (currentBackendListId == null) {
-            Log.e(TAG, "Backend list ID not known yet!")
+        if (!isDataReady || currentBackendListId == null) {
+            Log.e(TAG, "Backend list ID not known yet! Waiting...")
+            // Wait a bit and retry
+            CoroutineScope(Dispatchers.Main).launch {
+                delay(1000)
+                if (currentBackendListId != null) {
+                    Log.d(TAG, "Retrying save...")
+                    saveItemCheckedState(itemIndex, isChecked, item)
+                } else {
+                    Log.e(TAG, "Still no backend ID, giving up")
+                    Toast.makeText(requireContext(), "Cannot save: List not ready", Toast.LENGTH_SHORT).show()
+                    // Revert the checkbox
+                    viewModel.updateItemChecked(currentListId, itemIndex, !isChecked)
+                }
+            }
             return
         }
-
-        val currentList = viewModel.allShoppingLists.value?.firstOrNull { it.id == currentListId } ?: return
 
         saveJob?.cancel()
 
@@ -274,47 +321,69 @@ class ListDetailsFragment : BaseFragment(R.layout.fragment_list_details) {
                 // Get the current list from backend
                 val getResponse = apiService.getShopLists(currentUserId)
 
-                if (getResponse.success) {
-                    val jsonArray = JSONArray(getResponse.body)
+                if (!getResponse.success) {
+                    Log.e(TAG, "Failed to get current list")
+                    withContext(Dispatchers.Main) {
+                        viewModel.updateItemChecked(currentListId, itemIndex, !isChecked)
+                    }
+                    return@launch
+                }
 
-                    for (i in 0 until jsonArray.length()) {
-                        val listObj = jsonArray.getJSONObject(i)
-                        if (listObj.getString("_id") == currentBackendListId) {
-                            val itemsArray = listObj.getJSONArray("items")
+                val jsonArray = JSONArray(getResponse.body)
+                var found = false
 
-                            if (itemIndex < itemsArray.length()) {
-                                val itemObj = itemsArray.getJSONObject(itemIndex)
+                for (i in 0 until jsonArray.length()) {
+                    val listObj = jsonArray.getJSONObject(i)
+                    if (listObj.getString("_id") == currentBackendListId) {
+                        Log.d(TAG, "Found list in backend response")
+                        val itemsArray = listObj.getJSONArray("items")
+
+                        // Create a new items array with updated checked state
+                        val updatedItemsArray = JSONArray()
+                        for (j in 0 until itemsArray.length()) {
+                            val itemObj = itemsArray.getJSONObject(j)
+                            if (j == itemIndex) {
                                 itemObj.put("isChecked", isChecked)
-
-                                val updatePayload = JSONObject().apply {
-                                    put("topic", listObj.getString("topic"))
-                                    put("items", itemsArray)
-                                }
-
-                                val updateResponse = apiService.updateShopList(
-                                    currentUserId,
-                                    currentBackendListId!!,
-                                    updatePayload
-                                )
-
-                                withContext(Dispatchers.Main) {
-                                    if (updateResponse.success) {
-                                        Log.d(TAG, "✅ Successfully saved to backend")
-                                    } else {
-                                        Log.e(TAG, "❌ Failed to save to backend")
-                                        Toast.makeText(requireContext(), "Failed to save to cloud", Toast.LENGTH_SHORT).show()
-                                        viewModel.updateItemChecked(currentListId, itemIndex, !isChecked)
-                                    }
-                                }
+                                Log.d(TAG, "Updated item $j to isChecked=$isChecked")
                             }
-                            break
+                            updatedItemsArray.put(itemObj)
                         }
+
+                        val updatePayload = JSONObject().apply {
+                            put("topic", listObj.getString("topic"))
+                            put("items", updatedItemsArray)
+                        }
+
+                        Log.d(TAG, "Sending update to backend...")
+                        val updateResponse = apiService.updateShopList(
+                            currentUserId,
+                            currentBackendListId!!,
+                            updatePayload
+                        )
+
+                        withContext(Dispatchers.Main) {
+                            if (updateResponse.success) {
+                                Log.d(TAG, "✅ Successfully saved checked state to backend")
+                            } else {
+                                Log.e(TAG, "❌ Failed to save to backend: ${updateResponse.statusCode}")
+                                viewModel.updateItemChecked(currentListId, itemIndex, !isChecked)
+                            }
+                        }
+                        found = true
+                        break
                     }
                 }
+
+                if (!found) {
+                    Log.e(TAG, "Could not find list with ID: $currentBackendListId")
+                    withContext(Dispatchers.Main) {
+                        viewModel.updateItemChecked(currentListId, itemIndex, !isChecked)
+                    }
+                }
+
             } catch (e: Exception) {
                 Log.e(TAG, "❌ Exception saving to backend", e)
                 withContext(Dispatchers.Main) {
-                    Toast.makeText(requireContext(), "Error: ${e.message}", Toast.LENGTH_SHORT).show()
                     viewModel.updateItemChecked(currentListId, itemIndex, !isChecked)
                 }
             }

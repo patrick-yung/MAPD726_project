@@ -3,12 +3,9 @@ package com.example.yungpakhongpatrick.mapd726_project
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
-import androidx.lifecycle.viewModelScope
 import android.util.Log
+import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
-import org.json.JSONObject
 
 class ListViewModel : ViewModel() {
 
@@ -26,14 +23,10 @@ class ListViewModel : ViewModel() {
 
     private val TAG = "ListViewModel"
 
-    // Stores the current list after filtering
     private val _filteredLists = MutableLiveData<List<SavedList>>(emptyList())
     val filteredLists: LiveData<List<SavedList>> = _filteredLists
 
     val draftCartList = mutableListOf<CartItem>()
-
-    // Initialize with empty map - will be populated from backend
-    private var _categorizedDataMap: Map<String, Map<String, List<Double>>> = emptyMap()
 
     // Function to fetch categorized data from backend
     fun fetchCategorizedData(apiService: ApiService) {
@@ -42,12 +35,12 @@ class ListViewModel : ViewModel() {
             _productError.value = null
 
             try {
-                val response = withContext(Dispatchers.IO) {
+                val response = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
                     apiService.getCategorizedProducts()
                 }
 
                 if (response.success && response.statusCode == 200) {
-                    val jsonObject = JSONObject(response.body)
+                    val jsonObject = org.json.JSONObject(response.body)
                     val result = mutableMapOf<String, MutableMap<String, List<Double>>>()
 
                     jsonObject.keys().forEach { category ->
@@ -65,7 +58,6 @@ class ListViewModel : ViewModel() {
                         result[category] = products
                     }
 
-                    _categorizedDataMap = result
                     _categorizedData.value = result
                     Log.d(TAG, "Successfully loaded ${result.size} categories from backend")
                 } else {
@@ -81,53 +73,10 @@ class ListViewModel : ViewModel() {
         }
     }
 
-    // Get categorized data synchronously (for use in fragments)
-    fun getCategorizedData(): Map<String, Map<String, List<Double>>> {
-        return _categorizedDataMap
-    }
-
-    // Search products by name (returns list of products with their categories)
-    fun searchProducts(apiService: ApiService, query: String, callback: (List<SearchResult>?) -> Unit) {
-        viewModelScope.launch {
-            try {
-                val response = withContext(Dispatchers.IO) {
-                    apiService.searchProducts(query)
-                }
-
-                if (response.success && response.statusCode == 200) {
-                    val jsonArray = org.json.JSONArray(response.body)
-                    val results = mutableListOf<SearchResult>()
-
-                    for (i in 0 until jsonArray.length()) {
-                        val productJson = jsonArray.getJSONObject(i)
-                        results.add(
-                            SearchResult(
-                                name = productJson.getString("name"),
-                                category = productJson.getString("category"),
-                                prices = listOf(
-                                    productJson.getJSONObject("prices").getDouble("walmart"),
-                                    productJson.getJSONObject("prices").getDouble("costco"),
-                                    productJson.getJSONObject("prices").getDouble("superstore")
-                                )
-                            )
-                        )
-                    }
-                    callback(results)
-                } else {
-                    callback(null)
-                }
-            } catch (e: Exception) {
-                Log.e(TAG, "Error searching products", e)
-                callback(null)
-            }
-        }
-    }
-
     // Add a new list
     fun addList(savedList: SavedList) {
         val currentList = _allShoppingLists.value?.toMutableList() ?: mutableListOf()
 
-        // Check if list already exists
         val existingIndex = currentList.indexOfFirst { it.id == savedList.id }
         if (existingIndex >= 0) {
             // Replace existing list
@@ -154,7 +103,6 @@ class ListViewModel : ViewModel() {
             Log.d(TAG, "Updated list: ${savedList.name} with ${savedList.items.size} items")
         } else {
             Log.w(TAG, "Attempted to update non-existent list: ${savedList.id}")
-            // If list doesn't exist, add it
             currentList.add(savedList)
             _allShoppingLists.value = currentList
             Log.d(TAG, "Added list that was meant to be updated: ${savedList.name}")
@@ -196,7 +144,6 @@ class ListViewModel : ViewModel() {
         if (month == "All Months") {
             _filteredLists.value = all
         } else {
-            // Only keep lists where the date string contains the month name
             _filteredLists.value = all.filter { it.date.contains(month) }
         }
         Log.d(TAG, "Filtered lists for month: $month")
@@ -213,10 +160,3 @@ class ListViewModel : ViewModel() {
         return _allShoppingLists.value?.firstOrNull { it.id == listId }
     }
 }
-
-// Data class for search results
-data class SearchResult(
-    val name: String,
-    val category: String,
-    val prices: List<Double>
-)
