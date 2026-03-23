@@ -13,17 +13,14 @@ import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
-import com.example.yungpakhongpatrick.mapd726_project.BaseFragment
-import com.example.yungpakhongpatrick.mapd726_project.R
+import androidx.core.content.ContextCompat
 import kotlinx.coroutines.*
 import org.json.JSONArray
 import org.json.JSONObject
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
-import androidx.core.content.ContextCompat
 
-// Simple data class
 data class CartItem(val name: String, val price: Double, val store: String, val type: String, var quantity: Int)
 
 class AddItemsFragment : BaseFragment(R.layout.fragment_add_items) {
@@ -37,11 +34,22 @@ class AddItemsFragment : BaseFragment(R.layout.fragment_add_items) {
     private lateinit var sessionManager: SessionManager
     private var currentUserId: String = ""
 
-    // Store categorized data locally
-    private var categorizedData: Map<String, Map<String, List<Double>>> = emptyMap()
+    // Edit mode variables
+    private var isEditMode = false
+    private var editListId: Long = 0L
+    private var editBackendId: String? = null
+    private var originalListName: String = ""
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+
+        // Check if we're in edit mode
+        arguments?.let {
+            isEditMode = it.getBoolean("IS_EDIT_MODE", false)
+            originalListName = it.getString("EDIT_LIST_NAME", "")
+            editListId = it.getLong("EDIT_LIST_ID", 0L)
+            editBackendId = it.getString("EDIT_BACKEND_ID", null)
+        }
 
         // Initialize SessionManager and get user ID
         sessionManager = SessionManager(requireContext())
@@ -59,21 +67,21 @@ class AddItemsFragment : BaseFragment(R.layout.fragment_add_items) {
         }
 
         Log.d("AddItemsFragment", "Current User ID: $currentUserId")
+        if (isEditMode) {
+            Log.d("AddItemsFragment", "EDIT MODE: Editing list: $originalListName")
+        }
 
         viewModel = androidx.lifecycle.ViewModelProvider(requireActivity()).get(ListViewModel::class.java)
 
         // Initialize ApiService with base URL from strings.xml
         val baseUrl = getString(R.string.base_url)
         apiService = ApiService(baseUrl)
-        Log.d("AddItemsFragment", "Base URL: $baseUrl")
-        Log.d("AddItemsFragment", "Using user ID: $currentUserId")
 
         // Find Views
         val etProductName = view.findViewById<AutoCompleteTextView>(R.id.etProductName)
         val tvPriceWalmart = view.findViewById<TextView>(R.id.tvPriceWalmart)
         val tvPriceCostco = view.findViewById<TextView>(R.id.tvPriceCostco)
         val tvPriceSuperstore = view.findViewById<TextView>(R.id.tvPriceSuperstore)
-
         val etQuantity = view.findViewById<AutoCompleteTextView>(R.id.etQuantity)
 
         // Setup Quantity Dropdown
@@ -111,31 +119,22 @@ class AddItemsFragment : BaseFragment(R.layout.fragment_add_items) {
         val btnSaveList = view.findViewById<TextView>(R.id.btnSaveListHeader)
         val etItemType = view.findViewById<AutoCompleteTextView>(R.id.etItemType)
 
-        // Fetch categorized data if not loaded
+        // Change the save button text for edit mode
+        if (isEditMode) {
+            btnSaveList.text = "Update"
+            Toast.makeText(requireContext(), "Editing: $originalListName", Toast.LENGTH_SHORT).show()
+        }
+
+        // Fetch categorized data if not already loaded
         if (viewModel.categorizedData.value == null) {
             viewModel.fetchCategorizedData(apiService)
         }
 
         // Observe categorized data
-        viewModel.categorizedData.observe(viewLifecycleOwner) { data ->
-            if (data != null && data.isNotEmpty()) {
-                categorizedData = data
+        viewModel.categorizedData.observe(viewLifecycleOwner) { categorizedData ->
+            if (categorizedData != null && categorizedData.isNotEmpty()) {
                 setupCategoryDropdown(etItemType, etProductName, tvPriceWalmart, tvPriceCostco, tvPriceSuperstore,
                     containerWalmart, containerCostco, containerSuperstore)
-            }
-        }
-
-        // Observe loading state
-        viewModel.isLoadingProducts.observe(viewLifecycleOwner) { isLoading ->
-            if (isLoading) {
-                Toast.makeText(requireContext(), "Loading products...", Toast.LENGTH_SHORT).show()
-            }
-        }
-
-        // Observe errors
-        viewModel.productError.observe(viewLifecycleOwner) { error ->
-            error?.let {
-                Toast.makeText(requireContext(), "Error: $it", Toast.LENGTH_SHORT).show()
             }
         }
 
@@ -166,7 +165,6 @@ class AddItemsFragment : BaseFragment(R.layout.fragment_add_items) {
             val itemType = etItemType.text.toString().trim()
             val productName = etProductName.text.toString().trim()
             val quantityStr = etQuantity.text.toString().trim()
-
             val quantity = if (quantityStr.isNotEmpty()) quantityStr.toInt() else 1
 
             if (itemType.isEmpty() || productName.isEmpty() || selectedStoreName == null) {
@@ -182,7 +180,7 @@ class AddItemsFragment : BaseFragment(R.layout.fragment_add_items) {
 
             val btnSaveHeader = view.findViewById<TextView>(R.id.btnSaveListHeader)
             btnSaveHeader.setTextColor(ContextCompat.getColor(requireContext(), R.color.smart_cart_orange))
-            btnSaveHeader.text = "Save (${viewModel.draftCartList.size})"
+            btnSaveHeader.text = if (isEditMode) "Update (${viewModel.draftCartList.size})" else "Save (${viewModel.draftCartList.size})"
             Toast.makeText(requireContext(), "Item added! Don't forget to Save.", Toast.LENGTH_SHORT).show()
 
             etItemType.setText("", false)
@@ -196,7 +194,7 @@ class AddItemsFragment : BaseFragment(R.layout.fragment_add_items) {
             selectedStoreName = null
         }
 
-        // Save List Button
+        // Save/Update List Button
         btnSaveList.setOnClickListener {
             if (viewModel.draftCartList.isEmpty()) {
                 Toast.makeText(requireContext(), "Your list is empty!", Toast.LENGTH_SHORT).show()
@@ -219,12 +217,14 @@ class AddItemsFragment : BaseFragment(R.layout.fragment_add_items) {
         containerCostco: LinearLayout,
         containerSuperstore: LinearLayout
     ) {
+        val categorizedData = viewModel.categorizedData.value
+        if (categorizedData == null || categorizedData.isEmpty()) return
+
         val categories = categorizedData.keys.toList()
         val typeAdapter = ArrayAdapter(requireContext(), android.R.layout.simple_dropdown_item_1line, categories)
         etItemType.setAdapter(typeAdapter)
         etItemType.setOnClickListener { etItemType.showDropDown() }
 
-        // When Category is picked -> Fill the Product Dropdown
         etItemType.setOnItemClickListener { _, _, position, _ ->
             val selectedCategory = categories[position]
             val productsInCategory = categorizedData[selectedCategory]?.keys?.toList() ?: emptyList()
@@ -242,7 +242,6 @@ class AddItemsFragment : BaseFragment(R.layout.fragment_add_items) {
 
         etProductName.setOnClickListener { etProductName.showDropDown() }
 
-        // When Product is picked -> Show the Prices
         etProductName.setOnItemClickListener { _, _, _, _ ->
             val selectedCategory = etItemType.text.toString()
             val selectedProduct = etProductName.text.toString()
@@ -270,53 +269,79 @@ class AddItemsFragment : BaseFragment(R.layout.fragment_add_items) {
         v3.setBackgroundColor(ContextCompat.getColor(requireContext(), R.color.light_background))
     }
 
-    private suspend fun saveListToBackend(listName: String, items: List<CartItem>): Boolean {
-        return try {
-            Log.d("SAVE", "=== Starting save process ===")
-            Log.d("SAVE", "List name: $listName")
-            Log.d("SAVE", "Number of items: ${items.size}")
-            Log.d("SAVE", "Using user ID: $currentUserId")
-
-            val itemsArray = JSONArray()
-            items.forEach { item ->
-                val itemObj = JSONObject().apply {
-                    put("name", "${item.name} (${item.type}) x${item.quantity} at ${item.store}")
-                    put("price", item.price * item.quantity)
-                    put("isChecked", false)
-                }
-                itemsArray.put(itemObj)
+    private fun saveListToBackend(listName: String, dialog: android.app.AlertDialog) {
+        val itemsArray = JSONArray()
+        for (item in viewModel.draftCartList) {
+            val itemJson = JSONObject().apply {
+                put("name", "${item.name} (${item.type}) x${item.quantity} at ${item.store}")
+                put("price", item.price * item.quantity)
+                put("isChecked", false)
             }
-
-            val requestBody = JSONObject().apply {
-                put("topic", listName)
-                put("items", itemsArray)
-            }
-
-            Log.d("SAVE", "Sending POST to: /users/$currentUserId/shoplists")
-            val response = apiService.createShopList(currentUserId, requestBody)
-
-            if (response.success) {
-                Log.d("SAVE", "✓ List saved successfully!")
-                true
-            } else {
-                Log.e("SAVE", "✗ Failed to save list. Code: ${response.statusCode}")
-                false
-            }
-        } catch (e: Exception) {
-            Log.e("SAVE", "✗ Exception in saveListToBackend", e)
-            false
+            itemsArray.put(itemJson)
         }
+
+        val shopListJson = JSONObject().apply {
+            put("topic", listName)
+            put("items", itemsArray)
+        }
+
+        val userId = sessionManager.getUserId() ?: ""
+
+        Thread {
+            try {
+                val response = if (isEditMode && editBackendId != null) {
+                    // Update existing list
+                    apiService.updateShopList(userId, editBackendId!!, shopListJson)
+                } else {
+                    // Create new list
+                    apiService.createShopList(userId, shopListJson)
+                }
+
+                requireActivity().runOnUiThread {
+                    if (response.success) {
+                        Toast.makeText(requireContext(),
+                            if (isEditMode) "List updated!" else "List saved!",
+                            Toast.LENGTH_SHORT).show()
+
+                        viewModel.draftCartList.clear()
+
+                        // Dismiss the dialog first
+                        dialog.dismiss()
+
+                        // Then navigate back
+                        parentFragmentManager.popBackStack()
+                    } else {
+                        // Keep dialog open on error
+                        Toast.makeText(requireContext(),
+                            if (isEditMode) "Failed to update: ${response.errorMessage}" else "Failed to save: ${response.errorMessage}",
+                            Toast.LENGTH_LONG).show()
+                    }
+                }
+            } catch (e: Exception) {
+                requireActivity().runOnUiThread {
+                    // Keep dialog open on error
+                    Toast.makeText(requireContext(), "Error: ${e.message}", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }.start()
     }
 
     private fun showSaveListDialog(llCartItemsContainer: LinearLayout, tvEmptyHint: TextView) {
         val dialogView = LayoutInflater.from(requireContext()).inflate(R.layout.dialog_save_list, null)
         val etListName = dialogView.findViewById<EditText>(R.id.etListName)
 
+        // Pre-fill the list name if in edit mode
+        if (isEditMode && originalListName.isNotEmpty()) {
+            etListName.setText(originalListName)
+        }
+
         val alertDialog = android.app.AlertDialog.Builder(requireContext())
             .setView(dialogView)
-            .setCancelable(true)
-            .setPositiveButton("Save", null)
-            .setNegativeButton("Cancel") { dialog, _ -> dialog.dismiss() }
+            .setCancelable(false)  // Prevent dismissing by tapping outside
+            .setPositiveButton(if (isEditMode) "Update" else "Save", null)
+            .setNegativeButton("Cancel") { dialog, _ ->
+                dialog.dismiss()
+            }
             .create()
 
         alertDialog.setOnShowListener {
@@ -327,32 +352,12 @@ class AddItemsFragment : BaseFragment(R.layout.fragment_add_items) {
                 if (listName.isEmpty()) {
                     etListName.error = "Please enter a list name"
                 } else {
+                    // Disable the save button and show loading text
                     saveButton.isEnabled = false
-                    saveButton.text = "Saving..."
+                    saveButton.text = if (isEditMode) "Updating..." else "Saving..."
 
-                    CoroutineScope(Dispatchers.IO).launch {
-                        val success = saveListToBackend(listName, viewModel.draftCartList)
-
-                        withContext(Dispatchers.Main) {
-                            if (success) {
-                                saveListToLocal(listName, viewModel.draftCartList)
-                                Toast.makeText(requireContext(), "List '$listName' saved to cloud!", Toast.LENGTH_SHORT).show()
-                                alertDialog.dismiss()
-
-                                // 1. Clear the draft cart to prevent double-saves
-                                viewModel.draftCartList.clear()
-
-                                // 2. Navigate away immediately!
-                                // (No need to manually reset colors or hints since we are leaving the screen)
-                                parentFragmentManager.popBackStack()
-
-                            } else {
-                                Toast.makeText(requireContext(), "Failed to save to cloud. Check Logcat.", Toast.LENGTH_LONG).show()
-                                saveButton.isEnabled = true
-                                saveButton.text = "Save"
-                            }
-                        }
-                    }
+                    // Save to backend and pass the dialog reference
+                    saveListToBackend(listName, alertDialog)
                 }
             }
         }
@@ -372,17 +377,22 @@ class AddItemsFragment : BaseFragment(R.layout.fragment_add_items) {
 
         val formattedDate = SimpleDateFormat("MMM d, yyyy", Locale.getDefault()).format(Date())
 
-        val backendId = "local_${System.currentTimeMillis()}"
-        val localId = backendId.hashCode().toLong()
+        val backendId = if (isEditMode && editBackendId != null) editBackendId!! else "local_${System.currentTimeMillis()}"
+        val localId = if (isEditMode) editListId else backendId.hashCode().toLong()
 
         val newListEntry = SavedList(
             id = localId,
+            backendId = backendId,
             name = name,
             date = formattedDate,
             items = savedItems
         )
 
-        viewModel.addList(newListEntry)
+        if (isEditMode) {
+            viewModel.updateList(newListEntry)
+        } else {
+            viewModel.addList(newListEntry)
+        }
     }
 
     private fun navigateToLogin() {
@@ -417,13 +427,13 @@ class AddItemsFragment : BaseFragment(R.layout.fragment_add_items) {
         if (viewModel.draftCartList.isEmpty()) {
             tvEmptyHint.visibility = View.VISIBLE
             btnSaveHeader.setTextColor(ContextCompat.getColor(requireContext(), R.color.white))
-            btnSaveHeader.text = "Save"
+            btnSaveHeader.text = if (isEditMode) "Update" else "Save"
             return
         }
 
         tvEmptyHint.visibility = View.GONE
         btnSaveHeader.setTextColor(ContextCompat.getColor(requireContext(), R.color.smart_cart_orange))
-        btnSaveHeader.text = "Save (${viewModel.draftCartList.size})"
+        btnSaveHeader.text = if (isEditMode) "Update (${viewModel.draftCartList.size})" else "Save (${viewModel.draftCartList.size})"
 
         viewModel.draftCartList.forEachIndexed { index, item ->
             val totalItemPrice = item.price * item.quantity
