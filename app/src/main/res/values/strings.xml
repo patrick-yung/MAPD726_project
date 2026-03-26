@@ -1,6 +1,6 @@
 <resources>
     <string name="app_name">MAPD726_project</string>
-<!--    <string name="base_url">https://mapd713-group-project.onrender.com</string>-->
+    <!--    <string name="base_url">https://mapd713-group-project.onrender.com</string>-->
     <string name="base_url">https://mapd713-group-project.onrender.com</string>
 
     <!-- TODO: Remove or change this placeholder text -->
@@ -11,7 +11,7 @@
     <string name="compareText">Compare Prices Across Stores</string>
     <string name="compareBtn"><![CDATA[Start Comparing >]]></string>
     <string name="previousListText">Previous Shopping Lists</string>
-    <string name="addItemsHeader">Build Your List</string>
+    <string name="addItemsHeader">Add Items</string>
     <string name="selectItemText">Your list is empty. Select a product below!</string>
     <string name="searchProductText">Search product (e.g. Milk)</string>
     <string name="walmart">Walmart</string>
@@ -24,8 +24,8 @@
     <string name="costco1">Costco</string>
     <string name="unit_price">Unit Price: $0.50 / L</string>
     <string name="costco2">Costco</string>
-    <string name="dealsHeader">Weekly deals</string>
-    <string name="listHeader">My Shopping List</string>
+    <string name="dealsHeader">Weekly Deals</string>
+    <string name="listHeader">Shopping Lists</string>
     <string name="estimated_total">Estimated Total</string>
     <string name="_0_00">$0.00</string>
     <string name="listDetailsHeader">List Details</string>
@@ -36,4 +36,12 @@
     <string name="product_name">Product Name</string>
     <string name="details">Details</string>
     <string name="weekly_groceries">Weekly Groceries</string>
+    <string name="welcome_message">Welcome back,</string>
+    <string name="account">Account</string>
+    <string name="edit_profile">Edit Profile</string>
+    <string name="account_information">Account Information</string>
+    <string name="phone_number">Phone Number</string>
+    <string name="app_settings">App Settings</string>
+    <string name="logOutBtnText">Log Out</string>
+    <string name="shopping_lists_text">Shopping Lists</string>
 </resources>

@@ -23,6 +23,7 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import java.util.TimeZone
+import android.widget.ImageView
 
 class HomeFragment : Fragment() {
     private lateinit var listViewModel: ListViewModel
@@ -48,6 +49,16 @@ class HomeFragment : Fragment() {
 
         tvWelcome.text = "Welcome back, $userName"
 
+        // 1. Find the new avatar image
+        val ivHomeProfileAvatar = view.findViewById<ImageView>(R.id.ivHomeProfileAvatar)
+
+        // 2. Set the click listener to open the user profile
+        ivHomeProfileAvatar.setOnClickListener {
+            parentFragmentManager.beginTransaction()
+                .replace(R.id.fragment_container, UserProfileFragment())
+                .addToBackStack(null) // This lets you use the back button to return home
+                .commit()
+        }
         val etSearchHome = view.findViewById<EditText>(R.id.etSearchHome)
 
         etSearchHome.setOnEditorActionListener { _, actionId, _ ->
