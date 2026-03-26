@@ -30,7 +30,7 @@
         android:id="@+id/tvListTitle"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="My Shopping Lists"
+        android:text="@string/shopping_lists_text"
         android:textColor="@color/white"
         android:textSize="20sp"
         android:textStyle="bold"
