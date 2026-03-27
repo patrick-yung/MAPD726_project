@@ -40,6 +40,9 @@ class StoresMapFragment : Fragment(R.layout.fragment_stores_map), OnMapReadyCall
     private lateinit var btnDisable2: Button
     private lateinit var btnDisable3: Button
 
+    private lateinit var btnRefreshLocation: Button
+    private lateinit var btnResetStores: Button
+
     private val fusedLocationClient by lazy {
         LocationServices.getFusedLocationProviderClient(requireActivity())
     }
@@ -71,6 +74,19 @@ class StoresMapFragment : Fragment(R.layout.fragment_stores_map), OnMapReadyCall
         btnDisable2 = view.findViewById(R.id.btnDisable2)
         btnDisable3 = view.findViewById(R.id.btnDisable3)
 
+        btnRefreshLocation = view.findViewById(R.id.btnRefreshLocation)
+        btnResetStores = view.findViewById(R.id.btnResetStores)
+
+        btnRefreshLocation.setOnClickListener {
+            requestFreshLocation()
+        }
+
+        btnResetStores.setOnClickListener {
+            StoreRepository.resetStores()
+            Toast.makeText(requireContext(), "All stores reset", Toast.LENGTH_SHORT).show()
+            lastKnownLocation?.let { showClosestStores(it) } ?: requestFreshLocation()
+        }
+
         val mapFragment =
             childFragmentManager.findFragmentById(R.id.map) as SupportMapFragment
 
@@ -84,6 +100,7 @@ class StoresMapFragment : Fragment(R.layout.fragment_stores_map), OnMapReadyCall
         map.moveCamera(CameraUpdateFactory.newLatLngZoom(fallback, 10f))
         map.uiSettings.isZoomControlsEnabled = true
         map.uiSettings.isMyLocationButtonEnabled = true
+        map.setPadding(0, 0, 0, 190)
 
         checkLocationPermissionAndEnable()
     }
@@ -129,26 +146,34 @@ class StoresMapFragment : Fragment(R.layout.fragment_stores_map), OnMapReadyCall
     private fun requestFreshLocation() {
         if (!hasLocationPermission()) return
 
-        fusedLocationClient.getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, null)
-            .addOnSuccessListener { location ->
-                if (location != null) {
-                    lastKnownLocation = location
-                    showClosestStores(location)
-                } else {
+        try {
+            fusedLocationClient.getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, null)
+                .addOnSuccessListener { location ->
+                    if (location != null) {
+                        lastKnownLocation = location
+                        showClosestStores(location)
+                    } else {
+                        Toast.makeText(
+                            requireContext(),
+                            "Could not get current location. Use the emulator geo fix command, then tap Refresh.",
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    }
+                }
+                .addOnFailureListener {
                     Toast.makeText(
                         requireContext(),
-                        "Could not get current location. Turn on location and try again.",
+                        "Could not refresh location.",
                         Toast.LENGTH_SHORT
                     ).show()
                 }
-            }
-            .addOnFailureListener {
-                Toast.makeText(
-                    requireContext(),
-                    "Could not refresh location.",
-                    Toast.LENGTH_SHORT
-                ).show()
-            }
+        } catch (e: SecurityException) {
+            Toast.makeText(
+                requireContext(),
+                "Location permission is required to get your current location.",
+                Toast.LENGTH_SHORT
+            ).show()
+        }
     }
 
     private fun showClosestStores(userLocation: Location) {
@@ -166,16 +191,17 @@ class StoresMapFragment : Fragment(R.layout.fragment_stores_map), OnMapReadyCall
             }
             .take(3)
 
-        if (closestStores.isEmpty()) {
-            googleMap?.clear()
-            googleMap?.addMarker(
-                MarkerOptions()
-                    .position(userLatLng)
-                    .title("You are here")
-                    .icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_AZURE))
-            )
+        googleMap?.clear()
+        googleMap?.addMarker(
+            MarkerOptions()
+                .position(userLatLng)
+                .title("You are here")
+                .snippet("Current device location")
+                .icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_AZURE))
+        )
 
-            tvStore1.text = "No enabled stores available"
+        if (closestStores.isEmpty()) {
+            tvStore1.text = "No enabled stores. Tap Reset."
             tvStore2.text = ""
             tvStore3.text = ""
 
@@ -185,18 +211,8 @@ class StoresMapFragment : Fragment(R.layout.fragment_stores_map), OnMapReadyCall
             btnDisable1.visibility = View.GONE
             btnDisable2.visibility = View.GONE
             btnDisable3.visibility = View.GONE
-
             return
         }
-
-        googleMap?.clear()
-
-        googleMap?.addMarker(
-            MarkerOptions()
-                .position(userLatLng)
-                .title("You are here")
-                .icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_AZURE))
-        )
 
         val boundsBuilder = LatLngBounds.Builder()
         boundsBuilder.include(userLatLng)
@@ -216,56 +232,29 @@ class StoresMapFragment : Fragment(R.layout.fragment_stores_map), OnMapReadyCall
                 BitmapDescriptorFactory.HUE_RED
             }
 
-            val storeTitle = if (store.isFavorite) {
-                "★ ${index + 1}. ${store.name}"
-            } else {
-                "${index + 1}. ${store.name}"
-            }
-
             googleMap?.addMarker(
                 MarkerOptions()
                     .position(storeLatLng)
-                    .title(storeTitle)
-                    .snippet(String.format(Locale.getDefault(), "%.2f km away", distanceKm))
+                    .title("${index + 1}. ${store.name}")
+                    .snippet(
+                        "Rating: ${String.format(Locale.getDefault(), "%.1f", store.rating)}★\n" +
+                                "Distance: ${String.format(Locale.getDefault(), "%.2f km", distanceKm)}\n" +
+                                store.address
+                    )
                     .icon(BitmapDescriptorFactory.defaultMarker(markerColor))
             )
 
             boundsBuilder.include(storeLatLng)
         }
 
-        val bounds = boundsBuilder.build()
-        googleMap?.animateCamera(CameraUpdateFactory.newLatLngBounds(bounds, 150))
-
+        googleMap?.animateCamera(CameraUpdateFactory.newLatLngBounds(boundsBuilder.build(), 140))
         updateStoreControls(userLocation, closestStores)
     }
 
     private fun updateStoreControls(userLocation: Location, closestStores: List<StoreLocation>) {
-        updateSingleStoreRow(
-            rowIndex = 0,
-            userLocation = userLocation,
-            stores = closestStores,
-            tvStore = tvStore1,
-            btnFavorite = btnFavorite1,
-            btnDisable = btnDisable1
-        )
-
-        updateSingleStoreRow(
-            rowIndex = 1,
-            userLocation = userLocation,
-            stores = closestStores,
-            tvStore = tvStore2,
-            btnFavorite = btnFavorite2,
-            btnDisable = btnDisable2
-        )
-
-        updateSingleStoreRow(
-            rowIndex = 2,
-            userLocation = userLocation,
-            stores = closestStores,
-            tvStore = tvStore3,
-            btnFavorite = btnFavorite3,
-            btnDisable = btnDisable3
-        )
+        updateSingleStoreRow(0, userLocation, closestStores, tvStore1, btnFavorite1, btnDisable1)
+        updateSingleStoreRow(1, userLocation, closestStores, tvStore2, btnFavorite2, btnDisable2)
+        updateSingleStoreRow(2, userLocation, closestStores, tvStore3, btnFavorite3, btnDisable3)
     }
 
     private fun updateSingleStoreRow(
@@ -291,36 +280,26 @@ class StoresMapFragment : Fragment(R.layout.fragment_stores_map), OnMapReadyCall
             store.longitude
         ) / 1000.0
 
-        val title = if (store.isFavorite) {
-            "★ ${store.name} - ${String.format(Locale.getDefault(), "%.2f km", distanceKm)}"
-        } else {
-            "${store.name} - ${String.format(Locale.getDefault(), "%.2f km", distanceKm)}"
+        tvStore.text = buildString {
+            if (store.isFavorite) append("★ ")
+            append(store.name)
+            append("\n")
+            append(String.format(Locale.getDefault(), "%.1f★  •  %.2f km", store.rating, distanceKm))
         }
 
-        tvStore.text = title
         btnFavorite.visibility = View.VISIBLE
         btnDisable.visibility = View.VISIBLE
-
         btnFavorite.text = if (store.isFavorite) "Unfavorite" else "Favorite"
 
         btnFavorite.setOnClickListener {
             store.isFavorite = !store.isFavorite
-            lastKnownLocation?.let { location ->
-                showClosestStores(location)
-            }
+            lastKnownLocation?.let { showClosestStores(it) }
         }
 
         btnDisable.setOnClickListener {
             store.isEnabled = false
-            Toast.makeText(
-                requireContext(),
-                "${store.name} disabled",
-                Toast.LENGTH_SHORT
-            ).show()
-
-            lastKnownLocation?.let { location ->
-                showClosestStores(location)
-            }
+            Toast.makeText(requireContext(), "${store.name} disabled", Toast.LENGTH_SHORT).show()
+            lastKnownLocation?.let { showClosestStores(it) }
         }
     }
 

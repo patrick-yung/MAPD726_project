@@ -1,8 +1,5 @@
 package com.example.yungpakhongpatrick.mapd726_project
 
-import com.example.yungpakhongpatrick.mapd726_project.ComparisonFragment
-import android.content.ContentValues.TAG
-import android.content.Intent
 import android.os.Bundle
 import android.util.Log
 import androidx.fragment.app.Fragment
@@ -11,6 +8,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
 import android.widget.EditText
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.lifecycle.ViewModelProvider
@@ -23,72 +21,53 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import java.util.TimeZone
-import android.widget.ImageView
 
 class HomeFragment : Fragment() {
     private lateinit var listViewModel: ListViewModel
-    private val TAG = "HomeFragment"
+    private val tagName = "HomeFragment"
+    private var tvFavoriteStoresSummary: TextView? = null
 
-    // 1. Load the XML Layout
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?,
         savedInstanceState: Bundle?
-    ): View? {
+    ): View {
         return inflater.inflate(R.layout.fragment_home, container, false)
     }
 
-    // 2. Set up the Logic (Button Clicks)
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        listViewModel = ViewModelProvider(requireActivity()).get(ListViewModel::class.java)
+        listViewModel = ViewModelProvider(requireActivity())[ListViewModel::class.java]
 
         val sessionManager = SessionManager(requireContext())
         val tvWelcome = view.findViewById<TextView>(R.id.tvWelcome)
-        val userName = sessionManager.getUserName() ?: "Iffat"
-
+        val userName = sessionManager.getUserName() ?: "User"
         tvWelcome.text = "Welcome back, $userName"
 
-        // 1. Find the new avatar image
-        val ivHomeProfileAvatar = view.findViewById<ImageView>(R.id.ivHomeProfileAvatar)
+        tvFavoriteStoresSummary = view.findViewById(R.id.tvFavoriteStoresSummary)
+        updateFavoriteStoresSummary()
 
-        // 2. Set the click listener to open the user profile
-        ivHomeProfileAvatar.setOnClickListener {
+        val ivHomeProfileAvatar = view.findViewById<ImageView>(R.id.ivHomeProfileAvatar)
+        ivHomeProfileAvatar?.setOnClickListener {
             parentFragmentManager.beginTransaction()
                 .replace(R.id.fragment_container, UserProfileFragment())
-                .addToBackStack(null) // This lets you use the back button to return home
+                .addToBackStack(null)
                 .commit()
         }
-        val etSearchHome = view.findViewById<EditText>(R.id.etSearchHome)
 
+        val etSearchHome = view.findViewById<EditText>(R.id.etSearchHome)
         etSearchHome.setOnEditorActionListener { _, actionId, _ ->
             if (actionId == android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH) {
-                val query = etSearchHome.text.toString().trim()
-                if (query.isNotEmpty()) {
-                    val fragment = ComparisonFragment().apply {
-                        arguments = Bundle().apply {
-                            putString("PRODUCT_QUERY", query)
-                        }
-                    }
-                    parentFragmentManager.beginTransaction()
-                        .replace(R.id.fragment_container, fragment)
-                        .addToBackStack(null)
-                        .commit()
-                }
+                openComparisonWithQuery(etSearchHome.text.toString().trim())
                 true
             } else {
                 false
             }
         }
 
-        // 1. Find the container created in XML
         val llRecentListsContainer = view.findViewById<LinearLayout>(R.id.llRecentListsContainer)
 
-        // 2. Initialize ListViewModel
-        val viewModel = androidx.lifecycle.ViewModelProvider(requireActivity()).get(ListViewModel::class.java)
-
-        // 3. OBSERVE the LiveData
-        viewModel.allShoppingLists.observe(viewLifecycleOwner) { allLists ->
+        listViewModel.allShoppingLists.observe(viewLifecycleOwner) { allLists ->
             llRecentListsContainer.removeAllViews()
 
             if (allLists.isNullOrEmpty()) {
@@ -102,47 +81,53 @@ class HomeFragment : Fragment() {
                 return@observe
             }
 
-            // Grab the last 3 lists added, and reverse them so the absolute newest is at the very top!
             val recentLists = allLists.takeLast(3).reversed()
 
-
             for (savedList in recentLists) {
-                val cardView = LayoutInflater.from(requireContext()).inflate(R.layout.item_home_list_card, llRecentListsContainer, false)
+                val cardView = LayoutInflater.from(requireContext())
+                    .inflate(R.layout.item_home_list_card, llRecentListsContainer, false)
+
                 val tvListName = cardView.findViewById<TextView>(R.id.tvListName)
                 val tvListMetadata = cardView.findViewById<TextView>(R.id.tvListMetadata)
                 val tvListPrice = cardView.findViewById<TextView>(R.id.tvListPrice)
 
-                // Set the Name and Date
                 tvListName.text = savedList.name
                 tvListMetadata.text = "${savedList.items.size} items • ${savedList.date}"
 
-                // Calculate the Total Price
                 val totalPrice = savedList.items.sumOf { it.price }
-                tvListPrice.text = "$${String.format(java.util.Locale.getDefault(), "%.2f", totalPrice)}"
+                tvListPrice.text = "$${String.format(Locale.getDefault(), "%.2f", totalPrice)}"
 
-
-                // Add the fully built card to the screen
                 llRecentListsContainer.addView(cardView)
             }
         }
 
         val btnCompare = view.findViewById<Button>(R.id.btnStartComparing)
         btnCompare.setOnClickListener {
-            parentFragmentManager.beginTransaction()
-                .replace(R.id.fragment_container, ComparisonFragment())
-                .addToBackStack(null)
-                .commit()
+            openComparisonWithQuery(etSearchHome.text.toString().trim())
         }
-        fetchListsFromBackend()
 
         val btnOpenMap = view.findViewById<Button>(R.id.btnOpenMap)
-
         btnOpenMap.setOnClickListener {
             parentFragmentManager.beginTransaction()
                 .replace(R.id.fragment_container, StoresMapFragment())
                 .addToBackStack(null)
                 .commit()
         }
+
+        fetchListsFromBackend()
+    }
+
+    private fun openComparisonWithQuery(query: String) {
+        val fragment = ComparisonFragment().apply {
+            arguments = Bundle().apply {
+                putString("PRODUCT_QUERY", query)
+            }
+        }
+
+        parentFragmentManager.beginTransaction()
+            .replace(R.id.fragment_container, fragment)
+            .addToBackStack(null)
+            .commit()
     }
 
     private fun fetchListsFromBackend() {
@@ -159,7 +144,7 @@ class HomeFragment : Fragment() {
                     }
                 }
             } catch (e: Exception) {
-                Log.e(TAG, "Error fetching lists", e)
+                Log.e(tagName, "Error fetching lists", e)
             }
         }
     }
@@ -180,10 +165,13 @@ class HomeFragment : Fragment() {
                     val itemObj = itemsArray.getJSONObject(j)
                     val itemName = itemObj.getString("name")
                     val itemPrice = itemObj.getDouble("price")
-                    val isChecked = if (itemObj.has("isChecked")) itemObj.getBoolean("isChecked") else false
+                    val isChecked =
+                        if (itemObj.has("isChecked")) itemObj.getBoolean("isChecked") else false
 
-                    val store = if (itemName.contains(" at ")) itemName.substringAfter(" at ") else "Unknown"
-                    val name = if (itemName.contains(" at ")) itemName.substringBefore(" at ") else itemName
+                    val store =
+                        if (itemName.contains(" at ")) itemName.substringAfter(" at ") else "Unknown"
+                    val name =
+                        if (itemName.contains(" at ")) itemName.substringBefore(" at ") else itemName
 
                     savedItems.add(SavedItem(name, itemPrice, store, isChecked))
                 }
@@ -196,14 +184,13 @@ class HomeFragment : Fragment() {
 
                 val savedList = SavedList(localId, backendListId, topic, formattedDate, savedItems)
 
-                // This updates the shared ViewModel and triggers the observer above
                 val existingLists = listViewModel.allShoppingLists.value ?: emptyList()
                 if (!existingLists.any { it.id == localId }) {
                     listViewModel.addList(savedList)
                 }
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Error parsing lists", e)
+            Log.e(tagName, "Error parsing lists", e)
         }
     }
 
@@ -218,9 +205,24 @@ class HomeFragment : Fragment() {
         }
     }
 
+    private fun updateFavoriteStoresSummary() {
+        val favoriteStores = StoreRepository.stores
+            .filter { it.isFavorite && it.isEnabled }
+            .take(3)
+
+        tvFavoriteStoresSummary?.text = if (favoriteStores.isEmpty()) {
+            "You have not favorited any stores yet."
+        } else {
+            favoriteStores.joinToString("\n") { store ->
+                "★ ${store.name} • ${String.format(Locale.getDefault(), "%.1f", store.rating)}★"
+            }
+        }
+    }
+
     override fun onResume() {
         super.onResume()
         val bottomNav = requireActivity().findViewById<View>(R.id.bottom_navigation)
         bottomNav?.visibility = View.VISIBLE
+        updateFavoriteStoresSummary()
     }
 }
