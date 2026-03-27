@@ -3,6 +3,7 @@ package com.example.yungpakhongpatrick.mapd726_project
 import android.os.Bundle
 import android.util.Log
 import android.view.View
+import android.widget.ImageView
 import android.widget.TextView
 import android.widget.Toast
 import androidx.lifecycle.ViewModelProvider
@@ -23,11 +24,12 @@ class ListDetailsFragment : BaseFragment(R.layout.fragment_list_details) {
     private var currentUserId: String = ""
     private var currentListId: Long = 0L
     private var currentBackendListId: String? = null
+    private var currentListName: String = ""
     private var fetchJob: Job? = null
     private var saveJob: Job? = null
     private lateinit var checklistAdapter: ChecklistItemAdapter
     private var isUpdatingFromBackend = false
-    private var isDataReady = false  // Flag to track if backend ID is ready
+    private var isDataReady = false
 
     companion object {
         private const val TAG = "ListDetailsFragment"
@@ -80,6 +82,12 @@ class ListDetailsFragment : BaseFragment(R.layout.fragment_list_details) {
         val tvTotalAmount = view.findViewById<TextView>(R.id.tvListTotalAmount)
         val tvEmpty = view.findViewById<TextView>(R.id.tvEmptyItems)
         val rvItems = view.findViewById<RecyclerView>(R.id.rvListItems)
+        val btnEditList = view.findViewById<ImageView>(R.id.btnEditList)
+
+        // Setup edit button click listener
+        btnEditList.setOnClickListener {
+            editCurrentList()
+        }
 
         checklistAdapter = ChecklistItemAdapter(emptyList()) { itemIndex, isChecked ->
             if (isUpdatingFromBackend) {
@@ -127,6 +135,9 @@ class ListDetailsFragment : BaseFragment(R.layout.fragment_list_details) {
                 Log.d(TAG, "List name: ${selectedList.name}")
                 Log.d(TAG, "Number of items: ${selectedList.items.size}")
 
+                // Save the list name for editing
+                currentListName = selectedList.name
+
                 // Check if we have the backend ID
                 if (selectedList.backendId != null && currentBackendListId == null) {
                     currentBackendListId = selectedList.backendId
@@ -151,6 +162,53 @@ class ListDetailsFragment : BaseFragment(R.layout.fragment_list_details) {
 
         // Fetch from backend to get the backend ID
         fetchListFromBackend()
+    }
+
+    private fun editCurrentList() {
+        // Get the current list data
+        val currentList = viewModel.allShoppingLists.value?.firstOrNull { it.id == currentListId }
+
+        if (currentList == null) {
+            Toast.makeText(requireContext(), "Unable to edit list", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        if (currentList.items.isEmpty()) {
+            Toast.makeText(requireContext(), "Cannot edit empty list", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        Log.d(TAG, "Editing list: ${currentList.name} with ${currentList.items.size} items")
+
+        // Convert SavedItem to CartItem for the AddItemsFragment
+        val cartItems = currentList.items.map { savedItem ->
+            CartItem(
+                name = savedItem.name,
+                price = savedItem.price,
+                store = savedItem.store,
+                type = "1",
+                quantity = 1
+            )
+        }
+
+        // Clear the current draft cart and add the items from this list
+        viewModel.draftCartList.clear()
+        viewModel.draftCartList.addAll(cartItems)
+
+        // Navigate to AddItemsFragment with edit mode flag
+        val addItemsFragment = AddItemsFragment()
+        val bundle = Bundle().apply {
+            putBoolean("IS_EDIT_MODE", true)
+            putString("EDIT_LIST_NAME", currentList.name)
+            putLong("EDIT_LIST_ID", currentListId)
+            putString("EDIT_BACKEND_ID", currentBackendListId)
+        }
+        addItemsFragment.arguments = bundle
+
+        parentFragmentManager.beginTransaction()
+            .replace(R.id.fragment_container, addItemsFragment)
+            .addToBackStack("EditList")
+            .commit()
     }
 
     private fun fetchListFromBackend() {
@@ -205,7 +263,6 @@ class ListDetailsFragment : BaseFragment(R.layout.fragment_list_details) {
 
                 Log.d(TAG, "Processing list: $topic (backend ID: $backendListId, local ID: $localId)")
 
-                // If this is our current list, save the backend ID
                 if (localId == currentListId) {
                     currentBackendListId = backendListId
                     isDataReady = true
@@ -230,16 +287,18 @@ class ListDetailsFragment : BaseFragment(R.layout.fragment_list_details) {
 
                     Log.d(TAG, "  Item $j: $itemName, price: $itemPrice, isChecked: $isChecked")
 
-                    val store = if (itemName.contains(" at ")) {
-                        itemName.substringAfter(" at ")
-                    } else {
-                        "Unknown"
+                    var store = "Unknown"
+                    var type = "General"
+                    var name = itemName
+
+                    if (itemName.contains(" at ")) {
+                        store = itemName.substringAfter(" at ")
+                        name = itemName.substringBefore(" at ")
                     }
 
-                    val name = if (itemName.contains(" at ")) {
-                        itemName.substringBefore(" at ")
-                    } else {
-                        itemName
+                    if (name.contains(" (")) {
+                        type = name.substringAfter("(").substringBefore(")")
+                        name = name.substringBefore(" (")
                     }
 
                     savedItems.add(
@@ -270,7 +329,6 @@ class ListDetailsFragment : BaseFragment(R.layout.fragment_list_details) {
                     items = savedItems
                 )
 
-                // Check if list exists in ViewModel
                 val existingLists = viewModel.allShoppingLists.value ?: emptyList()
                 val existingList = existingLists.firstOrNull { it.id == localId }
 
@@ -293,12 +351,9 @@ class ListDetailsFragment : BaseFragment(R.layout.fragment_list_details) {
     private fun saveItemCheckedState(itemIndex: Int, isChecked: Boolean, item: SavedItem) {
         Log.d(TAG, "========== saveItemCheckedState() ==========")
         Log.d(TAG, "Item: ${item.name}, Index: $itemIndex, IsChecked: $isChecked")
-        Log.d(TAG, "Current Backend List ID: $currentBackendListId")
-        Log.d(TAG, "Is Data Ready: $isDataReady")
 
         if (!isDataReady || currentBackendListId == null) {
             Log.e(TAG, "Backend list ID not known yet! Waiting...")
-            // Wait a bit and retry
             CoroutineScope(Dispatchers.Main).launch {
                 delay(1000)
                 if (currentBackendListId != null) {
@@ -307,7 +362,6 @@ class ListDetailsFragment : BaseFragment(R.layout.fragment_list_details) {
                 } else {
                     Log.e(TAG, "Still no backend ID, giving up")
                     Toast.makeText(requireContext(), "Cannot save: List not ready", Toast.LENGTH_SHORT).show()
-                    // Revert the checkbox
                     viewModel.updateItemChecked(currentListId, itemIndex, !isChecked)
                 }
             }
@@ -318,7 +372,6 @@ class ListDetailsFragment : BaseFragment(R.layout.fragment_list_details) {
 
         saveJob = CoroutineScope(Dispatchers.IO).launch {
             try {
-                // Get the current list from backend
                 val getResponse = apiService.getShopLists(currentUserId)
 
                 if (!getResponse.success) {
@@ -338,7 +391,6 @@ class ListDetailsFragment : BaseFragment(R.layout.fragment_list_details) {
                         Log.d(TAG, "Found list in backend response")
                         val itemsArray = listObj.getJSONArray("items")
 
-                        // Create a new items array with updated checked state
                         val updatedItemsArray = JSONArray()
                         for (j in 0 until itemsArray.length()) {
                             val itemObj = itemsArray.getJSONObject(j)
